@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kalori">
+<meta name="theme-color" content="#000000">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="no-referrer">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<title>Kalori Takip</title>
+<style>
+:root{
+  --bg:#000;--card:#1c1c1e;--card2:#2c2c2e;--line:#38383a;--txt:#fff;--sub:#8e8e93;
+  --green:#30d158;--blue:#0a84ff;--orange:#ff9f0a;--red:#ff453a;--purple:#bf5af2;--teal:#64d2ff;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;font-size:16px}
+body{padding:env(safe-area-inset-top) 0 calc(76px + env(safe-area-inset-bottom))}
+header{padding:14px 18px 6px;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:30px;margin:0;font-weight:700}
+.datenav{display:flex;align-items:center;gap:6px}
+.datenav button{background:var(--card);border:0;color:var(--blue);font-size:20px;width:36px;height:36px;border-radius:18px}
+.datenav span{font-size:14px;color:var(--sub);min-width:84px;text-align:center}
+main{padding:0 14px}
+.card{background:var(--card);border-radius:16px;padding:16px;margin:12px 0}
+.card h2{font-size:17px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center}
+.card h2 small{color:var(--sub);font-weight:400;font-size:14px}
+.ringwrap{display:flex;align-items:center;gap:18px}
+.ring{position:relative;width:130px;height:130px;flex:none}
+.ring svg{transform:rotate(-90deg)}
+.ring .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .c b{font-size:26px}.ring .c span{font-size:12px;color:var(--sub)}
+.macros{flex:1;display:flex;flex-direction:column;gap:10px}
+.mrow{font-size:14px}.mrow div:first-child{display:flex;justify-content:space-between;margin-bottom:4px}
+.bar{height:8px;background:var(--card2);border-radius:4px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:4px;transition:width .3s}
+.note{font-size:13px;color:var(--orange);margin-top:10px}
+.note.ok{color:var(--green)}
+.btnrow{display:flex;gap:8px;margin-top:10px}
+.btn{flex:1;background:var(--card2);color:var(--txt);border:0;border-radius:10px;padding:11px;font-size:15px;font-weight:600}
+.btn.pri{background:var(--blue)}.btn.dan{color:var(--red)}
+.meal{border-top:1px solid var(--line);padding:10px 0}
+.meal:first-of-type{border-top:0;padding-top:0}
+.meal .mh{display:flex;justify-content:space-between;align-items:center}
+.meal .mh b{font-size:15px}.meal .mh span{color:var(--sub);font-size:13px}
+.add{background:none;border:0;color:var(--blue);font-size:15px;font-weight:600;padding:4px 0}
+.item{display:flex;justify-content:space-between;align-items:center;padding:7px 0 7px 4px;font-size:14px}
+.item .n{flex:1}.item .n small{display:block;color:var(--sub);font-size:12px}
+.item .k{color:var(--sub);margin-right:10px;white-space:nowrap}
+.x{background:none;border:0;color:var(--red);font-size:18px;padding:0 4px}
+input,select{background:var(--card2);color:var(--txt);border:0;border-radius:10px;padding:11px 12px;font-size:16px;width:100%;font-family:inherit}
+label{font-size:13px;color:var(--sub);display:block;margin:10px 0 4px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid2 label{margin-top:0}
+.chk{display:flex;align-items:center;gap:12px;padding:9px 0;font-size:15px;border-top:1px solid var(--line)}
+.chk:first-of-type{border-top:0}
+.chk input{width:22px;height:22px;accent-color:var(--green);flex:none}
+nav{position:fixed;bottom:0;left:0;right:0;background:rgba(28,28,30,.92);backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);border-top:1px solid var(--line);display:flex;
+  padding:6px 0 calc(6px + env(safe-area-inset-bottom));z-index:5}
+nav button{flex:1;background:none;border:0;color:var(--sub);font-size:11px;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav button .ic{font-size:22px}
+nav button.on{color:var(--blue)}
+.tab{display:none}.tab.on{display:block}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:10;align-items:flex-end}
+.modal.on{display:flex}
+.sheet{background:var(--card);width:100%;max-height:88vh;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));overflow:auto}
+.sheet h3{margin:0 0 12px;display:flex;justify-content:space-between}
+.sheet h3 button{background:none;border:0;color:var(--blue);font-size:16px}
+.flist .fi{padding:11px 4px;border-bottom:1px solid var(--line);font-size:15px}
+.flist .fi small{display:block;color:var(--sub);font-size:12px;margin-top:2px}
+.tag{display:inline-block;font-size:11px;background:var(--red);color:#fff;border-radius:5px;padding:1px 5px;margin-left:4px}
+.stat{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat div{background:var(--card2);border-radius:12px;padding:12px}
+.stat b{display:block;font-size:22px}.stat span{font-size:12px;color:var(--sub)}
+.hrow{display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
+.hrow:first-child{border-top:0}.hrow span{color:var(--sub)}
+.toggle{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:15px}
+.toggle input{width:auto}
+#chart{width:100%;height:220px}
+.qty{display:flex;gap:8px;align-items:center}
+.qty button{width:44px;height:44px;flex:none;background:var(--card2);color:var(--txt);border:0;border-radius:10px;font-size:22px}
+.seg{display:flex;background:var(--card2);border-radius:10px;padding:2px;margin:8px 0}
+.seg button{flex:1;background:none;border:0;color:var(--txt);padding:8px;border-radius:8px;font-size:14px}
+.seg button.on{background:var(--line)}
+.preview{text-align:center;color:var(--sub);margin:12px 0;font-size:14px}
+.preview b{color:var(--txt);font-size:20px}
+.toast{position:fixed;top:calc(12px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);background:var(--card2);
+  padding:10px 16px;border-radius:12px;font-size:14px;z-index:20;display:none}
+#lock{position:fixed;inset:0;background:#000;z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:30px}
+#lock b{font-size:22px}#lock input{max-width:220px;text-align:center;font-size:28px;letter-spacing:8px}
+.shake{animation:sh .35s}@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+</style>
+</head>
+<body>
+<div id="lock"><div style="font-size:44px">🔒</div><b>Kalori Takip</b>
+  <input id="lockIn" type="password" inputmode="numeric" pattern="[0-9]*" placeholder="PIN" onkeydown="if(event.key==='Enter')tryUnlock()">
+  <button class="btn pri" style="flex:none;width:220px" onclick="tryUnlock()">Aç</button></div>
+
+<header>
+  <h1 id="title">Bugün</h1>
+  <div class="datenav" id="datenav">
+    <button onclick="shiftDay(-1)">‹</button>
+    <span id="dateLbl"></span>
+    <button onclick="shiftDay(1)">›</button>
+  </div>
+</header>
+
+<main>
+<!-- ======================= BUGÜN ======================= -->
+<section class="tab on" id="t-today">
+  <div class="card">
+    <div class="ringwrap">
+      <div class="ring">
+        <svg width="130" height="130"><circle cx="65" cy="65" r="56" stroke="#2c2c2e" stroke-width="12" fill="none"/>
+          <circle id="ringArc" cx="65" cy="65" r="56" stroke="var(--green)" stroke-width="12" fill="none" stroke-linecap="round" stroke-dasharray="351.9" stroke-dashoffset="351.9"/></svg>
+        <div class="c"><b id="kcalEaten">0</b><span id="kcalOf">/ 2400 kcal</span></div>
+      </div>
+      <div class="macros">
+        <div class="mrow"><div><span>Protein</span><span id="pTxt">0 / 150 g</span></div><div class="bar"><i id="pBar" style="background:var(--purple)"></i></div></div>
+        <div class="mrow"><div><span>Karbonhidrat</span><span id="cTxt">0 g</span></div><div class="bar"><i id="cBar" style="background:var(--orange)"></i></div></div>
+        <div class="mrow"><div><span>Yağ</span><span id="fTxt">0 g</span></div><div class="bar"><i id="fBar" style="background:var(--teal)"></i></div></div>
+      </div>
+    </div>
+    <div class="note" id="kcalNote"></div>
+  </div>
+
+  <div class="card" id="meals"></div>
+
+  <div class="card">
+    <h2>💧 Su <small id="waterTxt">0 / 3000 ml</small></h2>
+    <div class="bar"><i id="waterBar" style="background:var(--blue)"></i></div>
+    <div class="btnrow">
+      <button class="btn" onclick="water(-250)">−250</button>
+      <button class="btn" onclick="water(250)">+250</button>
+      <button class="btn pri" onclick="water(500)">+500 ml</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>👟 Adım <small id="stepsTxt">0 / 6000</small></h2>
+    <div class="bar"><i id="stepsBar" style="background:var(--green)"></i></div>
+    <div class="btnrow">
+      <input id="stepsIn" type="number" inputmode="numeric" placeholder="Bugünkü adım (Sağlık uygulamasından)">
+      <button class="btn pri" style="flex:none;width:80px" onclick="saveSteps()">Kaydet</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🏋️ Ev egzersizi <small id="woTxt"></small></h2>
+    <div id="woList"></div>
+  </div>
+</section>
+
+<!-- ======================= KİLO ======================= -->
+<section class="tab" id="t-weight">
+  <div class="card">
+    <h2>Bugünkü tartı <small>sabah, aç karnına</small></h2>
+    <div class="btnrow" style="margin-top:0">
+      <input id="kgIn" type="text" inputmode="decimal" step="0.1" placeholder="örn. 118,4">
+      <button class="btn pri" style="flex:none;width:80px" onclick="saveWeight()">Kaydet</button>
+    </div>
+  </div>
+  <div class="card"><h2>Grafik <small>nokta: tartı · çizgi: 7 gün ort.</small></h2><svg id="chart"></svg></div>
+  <div class="card"><div class="stat" id="wStats"></div><div class="note" id="wNote"></div></div>
+  <div class="card"><h2>Kayıtlar</h2><div id="wList"></div></div>
+</section>
+
+<!-- ======================= GEÇMİŞ ======================= -->
+<section class="tab" id="t-history">
+  <div class="card"><div class="stat" id="hStats"></div></div>
+  <div class="card"><h2>Son 30 gün</h2><div id="hList"></div></div>
+</section>
+
+<!-- ======================= AYARLAR ======================= -->
+<section class="tab" id="t-settings">
+  <div class="card">
+    <h2>Hedefler</h2>
+    <div class="grid2">
+      <div><label>Günlük kalori hedefi</label><input id="s_kcal_hedef" type="number"></div>
+      <div><label>Alt sınır (bunun altına inme)</label><input id="s_kcal_min" type="number"></div>
+      <div><label>Protein (g)</label><input id="s_protein_hedef" type="number"></div>
+      <div><label>Su (ml)</label><input id="s_su_hedef" type="number"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Kilo hedefleri</h2>
+    <div class="grid2">
+      <div><label>Başlangıç tarihi</label><input id="s_baslangic_tarih" type="date"></div>
+      <div><label>Başlangıç kilosu</label><input id="s_baslangic_kilo" type="text" step="0.1" inputmode="decimal"></div>
+      <div><label>Şubat sonu hedef</label><input id="s_hedef_subat" type="text" step="0.1" inputmode="decimal"></div>
+      <div><label>Haziran sonu hedef</label><input id="s_hedef_haziran" type="text" step="0.1" inputmode="decimal"></div>
+      <div><label>Son hedef</label><input id="s_hedef_son" type="text" step="0.1" inputmode="decimal"></div>
+    </div>
+    <div class="toggle"><span>Uyarılı yiyecekleri göster<br><small style="color:var(--sub);font-size:12px">domates, peynir, yumurta sarısı, karamel…</small></span><input type="checkbox" id="s_uyarilari_goster"></div>
+    <div class="btnrow"><button class="btn pri" onclick="saveSettings()">Kaydet</button></div>
+  </div>
+  <div class="card">
+    <h2>Kendi yiyeceğini ekle <small>100 g başına</small></h2>
+    <label>Ad</label><input id="nf_name" placeholder="örn. Annemin tavuk sote">
+    <div class="grid2" style="margin-top:10px">
+      <div><label>kcal</label><input id="nf_kcal" type="text" inputmode="decimal"></div>
+      <div><label>Protein (g)</label><input id="nf_protein" type="text" inputmode="decimal"></div>
+      <div><label>Karbonhidrat (g)</label><input id="nf_carb" type="text" inputmode="decimal"></div>
+      <div><label>Yağ (g)</label><input id="nf_fat" type="text" inputmode="decimal"></div>
+      <div><label>Porsiyon adı</label><input id="nf_pn" placeholder="porsiyon"></div>
+      <div><label>Porsiyon (g)</label><input id="nf_pg" type="text" placeholder="100" inputmode="decimal"></div>
+    </div>
+    <div class="btnrow"><button class="btn pri" onclick="addFood()">Ekle</button></div>
+    <div id="customList" style="margin-top:10px"></div>
+  </div>
+  <div class="card">
+    <h2>🔒 PIN kilidi</h2>
+    <div id="pinOff">
+      <div class="grid2"><div><label>Yeni PIN (4-8 rakam)</label><input id="pin1" type="password" inputmode="numeric" pattern="[0-9]*"></div>
+      <div><label>Tekrar</label><input id="pin2" type="password" inputmode="numeric" pattern="[0-9]*"></div></div>
+      <div class="btnrow"><button class="btn pri" onclick="setPin()">PIN'i aç</button></div>
+    </div>
+    <div id="pinOn" style="display:none"><p style="color:var(--green);margin:0">PIN kilidi açık. Uygulama açılınca ve 2 dakikadan uzun arka planda kalınca PIN sorar.</p>
+      <div class="btnrow"><button class="btn dan" onclick="clearPin()">PIN'i kaldır</button></div></div>
+    <p style="color:var(--sub);font-size:12px;margin:10px 0 0">PIN'i unutursan kilidi açamazsın, düzenli yedek al.</p>
+  </div>
+  <div class="card">
+    <h2>💾 Yedek</h2>
+    <p style="color:var(--sub);font-size:13px;margin:0">Veriler sadece bu telefonda duruyor. Haftada bir yedek al (Dosyalar / iCloud Drive'a kaydet). Telefon değişirse veya uygulamayı silersen yedekten geri yüklersin.</p>
+    <div class="btnrow"><button class="btn pri" onclick="exportBackup()">Yedeği dışa aktar</button>
+      <button class="btn" onclick="document.getElementById('impIn').click()">Yedeği yükle</button></div>
+    <input type="file" id="impIn" accept=".json,application/json" style="display:none" onchange="importBackup(this)">
+  </div>
+  <p style="color:var(--sub);font-size:12px;text-align:center;padding:0 10px">Tüm veriler sadece bu cihazda saklanır, hiçbir sunucuya gönderilmez. Değerler yaklaşıktır. Kalori ve kilo hedeflerini doktorun ya da diyetisyeninle birlikte ayarla.</p>
+</section>
+</main>
+
+<nav>
+  <button class="on" data-t="today"><span class="ic">🍽️</span>Bugün</button>
+  <button data-t="weight"><span class="ic">⚖️</span>Kilo</button>
+  <button data-t="history"><span class="ic">📅</span>Geçmiş</button>
+  <button data-t="settings"><span class="ic">⚙️</span>Ayarlar</button>
+</nav>
+
+<!-- Yiyecek seçme -->
+<div class="modal" id="mFood" onclick="if(event.target===this)closeM()">
+  <div class="sheet">
+    <h3><span id="mTitle">Ekle</span><button onclick="closeM()">Kapat</button></h3>
+    <div id="pickStep">
+      <input id="fq" placeholder="Ara: tavuk, yoğurt, pilav…" oninput="searchFoods()" autocomplete="off">
+      <div class="flist" id="flist"></div>
+    </div>
+    <div id="qtyStep" style="display:none">
+      <div style="font-weight:600;font-size:17px" id="selName"></div>
+      <div class="seg"><button id="segP" class="on" onclick="setMode('p')">Porsiyon</button><button id="segG" onclick="setMode('g')">Gram</button></div>
+      <div class="qty">
+        <button onclick="bump(-1)">−</button>
+        <input id="qIn" type="text" inputmode="decimal" step="0.5" oninput="preview()" style="text-align:center;font-size:20px">
+        <button onclick="bump(1)">+</button>
+      </div>
+      <div class="preview" id="qPrev"></div>
+      <div class="btnrow"><button class="btn" onclick="backPick()">Geri</button><button class="btn pri" onclick="confirmAdd()">Ekle</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== Yerel veri katmanı: tüm veriler bu telefonda (localStorage) =====
+const LS_KEY = "kalori_v1";
+const WORKOUTS = ["Otur-kalk (squat) 3×12", "Duvar/masa şınavı 3×10", "Plank 3×30 sn", "Eğilerek çekiş 3×12"];
+const SEED_FOODS = [{"id":1,"name":"Tavuk göğsü (ızgara)","kcal":165,"protein":31,"carb":0,"fat":3.6,"portion_name":"porsiyon","portion_g":150,"flags":"","custom":0},{"id":2,"name":"Tavuk but (derisiz, fırın)","kcal":180,"protein":25,"carb":0,"fat":8.5,"portion_name":"porsiyon","portion_g":150,"flags":"","custom":0},{"id":3,"name":"Izgara köfte","kcal":230,"protein":20,"carb":5,"fat":15,"portion_name":"adet","portion_g":35,"flags":"","custom":0},{"id":4,"name":"Dana kıyma (yağsız, pişmiş)","kcal":215,"protein":26,"carb":0,"fat":12,"portion_name":"porsiyon","portion_g":100,"flags":"","custom":0},{"id":5,"name":"Ton balığı (suda, süzülmüş)","kcal":116,"protein":26,"carb":0,"fat":1,"portion_name":"kutu","portion_g":120,"flags":"","custom":0},{"id":6,"name":"Levrek / çupra (ızgara)","kcal":125,"protein":23,"carb":0,"fat":3.5,"portion_name":"porsiyon","portion_g":200,"flags":"","custom":0},{"id":7,"name":"Somon (fırın)","kcal":206,"protein":22,"carb":0,"fat":12,"portion_name":"porsiyon","portion_g":150,"flags":"","custom":0},{"id":8,"name":"Hindi füme","kcal":105,"protein":18,"carb":2,"fat":2.5,"portion_name":"dilim","portion_g":10,"flags":"","custom":0},{"id":9,"name":"Tavuk döner (ekmeksiz)","kcal":200,"protein":20,"carb":4,"fat":12,"portion_name":"porsiyon","portion_g":150,"flags":"","custom":0},{"id":10,"name":"Tavuk şiş","kcal":170,"protein":27,"carb":2,"fat":6,"portion_name":"porsiyon","portion_g":180,"flags":"","custom":0},{"id":11,"name":"Yumurta beyazı","kcal":52,"protein":11,"carb":0.7,"fat":0.2,"portion_name":"adet","portion_g":33,"flags":"","custom":0},{"id":12,"name":"Yumurta beyazı omlet (az yağlı)","kcal":75,"protein":11,"carb":1,"fat":3,"portion_name":"porsiyon","portion_g":170,"flags":"","custom":0},{"id":13,"name":"Süzme yoğurt (az yağlı)","kcal":75,"protein":10,"carb":4,"fat":2,"portion_name":"kase","portion_g":200,"flags":"","custom":0},{"id":14,"name":"Yoğurt (yarım yağlı)","kcal":50,"protein":4,"carb":5,"fat":1.5,"portion_name":"kase","portion_g":200,"flags":"","custom":0},{"id":15,"name":"Ayran","kcal":35,"protein":1.7,"carb":2.5,"fat":1.8,"portion_name":"bardak","portion_g":250,"flags":"","custom":0},{"id":16,"name":"Süt (yarım yağlı)","kcal":47,"protein":3.3,"carb":4.8,"fat":1.5,"portion_name":"bardak","portion_g":200,"flags":"","custom":0},{"id":17,"name":"Yulaf ezmesi","kcal":379,"protein":13,"carb":67,"fat":6.5,"portion_name":"porsiyon","portion_g":50,"flags":"","custom":0},{"id":18,"name":"Tam buğday ekmek","kcal":247,"protein":13,"carb":41,"fat":3.4,"portion_name":"dilim","portion_g":30,"flags":"","custom":0},{"id":19,"name":"Beyaz ekmek","kcal":265,"protein":9,"carb":49,"fat":3.2,"portion_name":"dilim","portion_g":30,"flags":"","custom":0},{"id":20,"name":"Lavaş","kcal":275,"protein":9,"carb":55,"fat":1.5,"portion_name":"adet","portion_g":60,"flags":"","custom":0},{"id":21,"name":"Bulgur pilavı","kcal":150,"protein":3.5,"carb":26,"fat":3.5,"portion_name":"porsiyon","portion_g":150,"flags":"","custom":0},{"id":22,"name":"Pirinç pilavı","kcal":175,"protein":3,"carb":32,"fat":4,"portion_name":"porsiyon","portion_g":150,"flags":"","custom":0},{"id":23,"name":"Makarna (haşlanmış, sade)","kcal":158,"protein":5.8,"carb":31,"fat":0.9,"portion_name":"porsiyon","portion_g":200,"flags":"","custom":0},{"id":24,"name":"Haşlanmış patates","kcal":87,"protein":1.9,"carb":20,"fat":0.1,"portion_name":"adet","portion_g":150,"flags":"","custom":0},{"id":25,"name":"Fırın patates (az yağlı)","kcal":130,"protein":2.5,"carb":21,"fat":4,"portion_name":"porsiyon","portion_g":150,"flags":"","custom":0},{"id":26,"name":"Mercimek çorbası","kcal":70,"protein":4,"carb":10,"fat":1.8,"portion_name":"kase","portion_g":250,"flags":"","custom":0},{"id":27,"name":"Tavuk suyu çorba","kcal":45,"protein":3.5,"carb":4,"fat":1.5,"portion_name":"kase","portion_g":250,"flags":"","custom":0},{"id":28,"name":"Nohut (haşlanmış)","kcal":164,"protein":8.9,"carb":27,"fat":2.6,"portion_name":"porsiyon","portion_g":150,"flags":"","custom":0},{"id":29,"name":"Yeşil mercimek (haşlanmış)","kcal":116,"protein":9,"carb":20,"fat":0.4,"portion_name":"porsiyon","portion_g":150,"flags":"","custom":0},{"id":30,"name":"Kuru fasulye (salçalı)","kcal":110,"protein":6,"carb":15,"fat":3,"portion_name":"porsiyon","portion_g":250,"flags":"domates","custom":0},{"id":31,"name":"Fırında sebze (kabak, biber, havuç)","kcal":70,"protein":1.5,"carb":8,"fat":4,"portion_name":"porsiyon","portion_g":200,"flags":"","custom":0},{"id":32,"name":"Haşlanmış brokoli","kcal":35,"protein":2.4,"carb":7,"fat":0.4,"portion_name":"porsiyon","portion_g":150,"flags":"","custom":0},{"id":33,"name":"Ispanak yemeği (domatessiz)","kcal":60,"protein":3,"carb":5,"fat":3.5,"portion_name":"porsiyon","portion_g":200,"flags":"","custom":0},{"id":34,"name":"Salatalık","kcal":15,"protein":0.7,"carb":3.6,"fat":0.1,"portion_name":"adet","portion_g":150,"flags":"","custom":0},{"id":35,"name":"Marul / roka / yeşillik","kcal":15,"protein":1.4,"carb":2.9,"fat":0.2,"portion_name":"porsiyon","portion_g":80,"flags":"","custom":0},{"id":36,"name":"Havuç","kcal":41,"protein":0.9,"carb":10,"fat":0.2,"portion_name":"adet","portion_g":80,"flags":"","custom":0},{"id":37,"name":"Yeşil biber","kcal":20,"protein":0.9,"carb":4.6,"fat":0.2,"portion_name":"adet","portion_g":30,"flags":"","custom":0},{"id":38,"name":"Muz","kcal":89,"protein":1.1,"carb":23,"fat":0.3,"portion_name":"adet","portion_g":120,"flags":"","custom":0},{"id":39,"name":"Elma","kcal":52,"protein":0.3,"carb":14,"fat":0.2,"portion_name":"adet","portion_g":180,"flags":"","custom":0},{"id":40,"name":"Armut","kcal":57,"protein":0.4,"carb":15,"fat":0.1,"portion_name":"adet","portion_g":180,"flags":"","custom":0},{"id":41,"name":"Mandalina","kcal":53,"protein":0.8,"carb":13,"fat":0.3,"portion_name":"adet","portion_g":80,"flags":"","custom":0},{"id":42,"name":"Ceviz içi","kcal":654,"protein":15,"carb":14,"fat":65,"portion_name":"avuç","portion_g":30,"flags":"","custom":0},{"id":43,"name":"Fındık","kcal":628,"protein":15,"carb":17,"fat":61,"portion_name":"avuç","portion_g":30,"flags":"","custom":0},{"id":44,"name":"Bal","kcal":304,"protein":0.3,"carb":82,"fat":0,"portion_name":"tatlı kaşığı","portion_g":7,"flags":"","custom":0},{"id":45,"name":"Zeytinyağı","kcal":884,"protein":0,"carb":0,"fat":100,"portion_name":"yemek kaşığı","portion_g":13,"flags":"","custom":0},{"id":46,"name":"Tereyağı","kcal":717,"protein":0.9,"carb":0.1,"fat":81,"portion_name":"tatlı kaşığı","portion_g":5,"flags":"","custom":0},{"id":47,"name":"Çay / kahve (şekersiz)","kcal":1,"protein":0,"carb":0,"fat":0,"portion_name":"bardak","portion_g":200,"flags":"","custom":0},{"id":48,"name":"Şeker (küp)","kcal":400,"protein":0,"carb":100,"fat":0,"portion_name":"adet","portion_g":3,"flags":"","custom":0},{"id":49,"name":"Domates","kcal":18,"protein":0.9,"carb":3.9,"fat":0.2,"portion_name":"adet","portion_g":120,"flags":"domates","custom":0},{"id":50,"name":"Menemen","kcal":95,"protein":5,"carb":4,"fat":7,"portion_name":"porsiyon","portion_g":200,"flags":"domates,yumurta_sarisi","custom":0},{"id":51,"name":"Lahmacun","kcal":220,"protein":9,"carb":30,"fat":7,"portion_name":"adet","portion_g":120,"flags":"domates","custom":0},{"id":52,"name":"Beyaz peynir","kcal":264,"protein":17,"carb":2,"fat":21,"portion_name":"dilim","portion_g":30,"flags":"peynir","custom":0},{"id":53,"name":"Kaşar peyniri","kcal":360,"protein":25,"carb":2,"fat":28,"portion_name":"dilim","portion_g":20,"flags":"peynir","custom":0},{"id":54,"name":"Haşlanmış yumurta (bütün)","kcal":155,"protein":13,"carb":1.1,"fat":11,"portion_name":"adet","portion_g":55,"flags":"yumurta_sarisi","custom":0},{"id":55,"name":"Kola","kcal":42,"protein":0,"carb":10.6,"fat":0,"portion_name":"kutu","portion_g":330,"flags":"karamel","custom":0},{"id":56,"name":"Karamelli tatlı / sufle","kcal":330,"protein":4,"carb":50,"fat":13,"portion_name":"porsiyon","portion_g":100,"flags":"karamel","custom":0},{"id":57,"name":"Patates kızartması","kcal":312,"protein":3.4,"carb":41,"fat":15,"portion_name":"porsiyon","portion_g":150,"flags":"mide","custom":0},{"id":58,"name":"Pizza","kcal":270,"protein":11,"carb":33,"fat":10,"portion_name":"dilim","portion_g":110,"flags":"domates,peynir,mide","custom":0},{"id":59,"name":"Hamburger","kcal":250,"protein":13,"carb":25,"fat":11,"portion_name":"adet","portion_g":220,"flags":"peynir,mide","custom":0}];
+const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+const DEFAULT_SETTINGS = {
+  kcal_hedef: "2400", kcal_min: "2000", protein_hedef: "150", su_hedef: "3000",
+  baslangic_tarih: todayIso(), baslangic_kilo: "120", hedef_subat: "111",
+  hedef_haziran: "100", hedef_son: "85", uyarilari_goster: "0",
+};
+
+let STORE = null;
+function load() {
+  if (STORE) return STORE;
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(LS_KEY)); } catch (e) {}
+  if (!s) s = { foods: SEED_FOODS.slice(), nextId: 1000, entries: [], daily: {}, weights: {}, settings: {}, pin: null };
+  s.settings = { ...DEFAULT_SETTINGS, ...s.settings };
+  // yeni sürümde eklenen hazır yiyecekleri de ekle
+  const names = new Set(s.foods.map(f => f.name));
+  SEED_FOODS.forEach(f => { if (!names.has(f.name)) s.foods.push({ ...f, id: s.nextId++ }); });
+  STORE = s; return s;
+}
+function save() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(STORE)); }
+  catch (e) { toast("Kaydedilemedi! Depolama dolu olabilir, yedek al."); throw e; }
+}
+const lc = s => String(s).toLocaleLowerCase("tr");
+const r1 = n => Math.round(n * 10) / 10;
+
+function stepTarget(day, s) {
+  const week = Math.floor((new Date(day) - new Date(s.baslangic_tarih)) / 864e5 / 7) + 1;
+  return week <= 4 ? 6000 : week <= 8 ? 8000 : 10000;
+}
+function dailyRow(day) { return { water: 0, steps: 0, workout: [], ...(load().daily[day] || {}) }; }
+function setDaily(day, kw) { const d = { ...dailyRow(day), ...kw }; load().daily[day] = d; save(); return d; }
+function foodById(id) { return load().foods.find(f => f.id === id); }
+function dayTotals(day) {
+  const t = { kcal: 0, protein: 0, carb: 0, fat: 0 };
+  load().entries.filter(e => e.day === day).forEach(e => {
+    const f = foodById(e.food_id); if (!f) return;
+    t.kcal += f.kcal * e.grams / 100; t.protein += f.protein * e.grams / 100;
+    t.carb += f.carb * e.grams / 100; t.fat += f.fat * e.grams / 100;
+  });
+  for (const k in t) t[k] = r1(t[k]);
+  return t;
+}
+
+function fail(msg) { toast(msg); throw { error: msg }; }
+
+async function api(path, opt = {}) {
+  const s = load(), m = (opt.method || "GET").toUpperCase(), b = opt.body || {};
+  const url = new URL(path, location.origin), p = url.pathname.replace(/^\/api\//, "").split("/");
+  const [res, arg] = [p[0], p[1] ? decodeURIComponent(p[1]) : null];
+
+  if (res === "foods") {
+    if (m === "GET") {
+      const q = lc(url.searchParams.get("q") || "").trim(), show = s.settings.uyarilari_goster === "1";
+      return s.foods.filter(f => (!q || lc(f.name).includes(q)) && (show || !f.flags))
+        .sort((a, c) => (c.custom - a.custom) || a.name.localeCompare(c.name, "tr"));
+    }
+    if (m === "POST") {
+      const name = String(b.name).trim();
+      if (s.foods.some(f => lc(f.name) === lc(name))) fail("Bu isimde yiyecek zaten var");
+      const f = { id: s.nextId++, name, kcal: +b.kcal, protein: +b.protein || 0, carb: +b.carb || 0,
+        fat: +b.fat || 0, portion_name: b.portion_name || "porsiyon", portion_g: +b.portion_g || 100, flags: "", custom: 1 };
+      s.foods.push(f); save(); return { id: f.id };
+    }
+    if (m === "DELETE") {
+      const id = +arg; s.foods = s.foods.filter(f => !(f.id === id && f.custom));
+      s.entries = s.entries.filter(e => foodById(e.food_id)); save(); return { ok: true };
+    }
+  }
+  if (res === "day") {
+    const entries = s.entries.filter(e => e.day === arg).map(e => {
+      const f = foodById(e.food_id);
+      return { id: e.id, meal: e.meal, grams: e.grams, name: f.name, portion_name: f.portion_name,
+        portion_g: f.portion_g, kcal: Math.round(f.kcal * e.grams / 100), protein: r1(f.protein * e.grams / 100) };
+    });
+    const d = dailyRow(arg);
+    return { day: arg, entries, totals: dayTotals(arg), water: d.water, steps: d.steps, workout: d.workout,
+      workouts_all: WORKOUTS, step_target: stepTarget(arg, s.settings), settings: s.settings };
+  }
+  if (res === "entries") {
+    if (m === "POST") { const e = { id: s.nextId++, day: b.day, meal: b.meal, food_id: +b.food_id, grams: +b.grams }; s.entries.push(e); save(); return { id: e.id }; }
+    if (m === "DELETE") { s.entries = s.entries.filter(e => e.id !== +arg); save(); return { ok: true }; }
+  }
+  if (res === "water") return setDaily(b.day, { water: Math.max(0, dailyRow(b.day).water + (+b.delta)) });
+  if (res === "steps") return setDaily(b.day, { steps: Math.max(0, +b.steps || 0) });
+  if (res === "workout") return setDaily(b.day, { workout: (b.done || []).filter(w => WORKOUTS.includes(w)) });
+  if (res === "weights") {
+    if (m === "GET") {
+      const rows = Object.keys(s.weights).sort().map(day => ({ day, kg: s.weights[day] }));
+      rows.forEach((r, i) => {
+        const d0 = new Date(r.day) - 6 * 864e5;
+        const win = rows.slice(0, i + 1).filter(x => new Date(x.day) >= d0).map(x => x.kg);
+        r.avg7 = r1(win.reduce((a, c) => a + c, 0) / win.length);
+      });
+      return { weights: rows, settings: s.settings };
+    }
+    if (m === "POST") { const kg = +b.kg; if (!(kg >= 30 && kg <= 300)) fail("Geçersiz kilo"); s.weights[b.day] = kg; save(); return { ok: true }; }
+    if (m === "DELETE") { delete s.weights[arg]; save(); return { ok: true }; }
+  }
+  if (res === "history") {
+    const days = Math.min(+url.searchParams.get("days") || 30, 365), out = [];
+    for (let i = 0; i < days; i++) {
+      const dt = new Date(); dt.setDate(dt.getDate() - i);
+      const d = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+      const t = dayTotals(d), r = dailyRow(d);
+      if (t.kcal || r.water || r.steps || r.workout.length)
+        out.push({ day: d, ...t, water: r.water, steps: r.steps, workout: r.workout.length > 0, step_target: stepTarget(d, s.settings) });
+    }
+    return { days: out, settings: s.settings };
+  }
+  if (res === "settings") {
+    if (m === "PUT") { for (const k in b) if (k in DEFAULT_SETTINGS) s.settings[k] = String(b[k]); save(); }
+    return s.settings;
+  }
+  fail("Bilinmeyen işlem");
+}
+
+// ===== Yedekleme =====
+async function exportBackup() {
+  const data = JSON.stringify(load(), null, 1);
+  const name = `kalori-yedek-${todayIso()}.json`;
+  const file = new File([data], name, { type: "application/json" });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: name }); return; }
+  } catch (e) { if (e.name === "AbortError") return; }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = name; a.click();
+}
+function importBackup(input) {
+  const f = input.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const d = JSON.parse(rd.result);
+      if (!d.foods || !d.entries || !d.settings) throw 0;
+      if (!confirm("Telefondaki mevcut veriler bu yedekle DEĞİŞTİRİLECEK. Devam?")) return;
+      STORE = null; localStorage.setItem(LS_KEY, JSON.stringify(d)); load(); toast("Yedek yüklendi"); show("today");
+    } catch (e) { toast("Geçersiz yedek dosyası"); }
+    input.value = "";
+  };
+  rd.readAsText(f);
+}
+
+// ===== PIN kilidi =====
+async function hashPin(pin) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("kalori:" + pin));
+  return [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2, "0")).join("");
+}
+async function setPin() {
+  const a = document.getElementById("pin1").value, c = document.getElementById("pin2").value;
+  if (!/^\d{4,8}$/.test(a)) return toast("PIN 4-8 rakam olmalı");
+  if (a !== c) return toast("PIN'ler aynı değil");
+  load().pin = await hashPin(a); save();
+  document.getElementById("pin1").value = document.getElementById("pin2").value = "";
+  toast("PIN kilidi açıldı"); renderPinState();
+}
+function clearPin() { if (!confirm("PIN kilidi kaldırılsın mı?")) return; load().pin = null; save(); toast("PIN kaldırıldı"); renderPinState(); }
+function renderPinState() {
+  const on = !!load().pin;
+  document.getElementById("pinOn").style.display = on ? "" : "none";
+  document.getElementById("pinOff").style.display = on ? "none" : "";
+}
+async function tryUnlock() {
+  const el = document.getElementById("lockIn");
+  if (await hashPin(el.value) === load().pin) { document.getElementById("lock").style.display = "none"; el.value = ""; loadDay(); }
+  else { el.value = ""; el.classList.add("shake"); setTimeout(() => el.classList.remove("shake"), 400); }
+}
+function lockIfNeeded() {
+  if (load().pin) { document.getElementById("lock").style.display = "flex"; setTimeout(() => document.getElementById("lockIn").focus(), 200); return true; }
+  return false;
+}
+// uygulama arka plandan dönünce 2 dakikadan fazla geçtiyse tekrar kilitle
+let hiddenAt = 0;
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) hiddenAt = Date.now();
+  else if (load().pin && hiddenAt && Date.now() - hiddenAt > 120000) lockIfNeeded();
+});
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+
+</script>
+<script>
+const MEALS=[["kahvalti","Kahvaltı"],["ogle","Öğle"],["ara","Ara öğün"],["aksam","Akşam"]];
+const FLAG_TR={domates:"domates",peynir:"peynir",yumurta_sarisi:"yumurta sarısı",karamel:"karamel ⚠️",mide:"mideyi yorar"};
+const pad=n=>String(n).padStart(2,"0");
+const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const fmt=(n,d=0)=>Number(n).toLocaleString("tr-TR",{maximumFractionDigits:d,minimumFractionDigits:d});
+let cur=new Date(),DAY=null,curMeal=null,sel=null,mode="p";
+
+function toast(t){const e=document.getElementById("toast");e.textContent=t;e.style.display="block";clearTimeout(e._t);e._t=setTimeout(()=>e.style.display="none",1800)}
+const $=id=>document.getElementById(id);
+const pct=(a,b)=>Math.min(100,b?a/b*100:0)+"%";
+
+// ------------- sekmeler -------------
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>show(b.dataset.t));
+function show(t){
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));
+  document.querySelectorAll(".tab").forEach(s=>s.classList.toggle("on",s.id==="t-"+t));
+  $("title").textContent={today:"Bugün",weight:"Kilo",history:"Geçmiş",settings:"Ayarlar"}[t];
+  $("datenav").style.visibility=t==="today"?"visible":"hidden";
+  ({today:loadDay,weight:loadWeights,history:loadHistory,settings:loadSettings})[t]();
+}
+
+// ------------- bugün -------------
+function shiftDay(n){cur.setDate(cur.getDate()+n);loadDay()}
+async function loadDay(){
+  const d=iso(cur),t=iso(new Date());
+  $("dateLbl").textContent=d===t?"Bugün":cur.toLocaleDateString("tr-TR",{day:"numeric",month:"short",weekday:"short"});
+  $("title").textContent=d===t?"Bugün":"Gün";
+  DAY=await api("/api/day/"+d);
+  const s=DAY.settings,T=DAY.totals,goal=+s.kcal_hedef,min=+s.kcal_min;
+  $("kcalEaten").textContent=fmt(T.kcal);
+  $("kcalOf").textContent=`/ ${fmt(goal)} kcal`;
+  const arc=$("ringArc"),ratio=Math.min(1,T.kcal/goal);
+  arc.style.strokeDashoffset=351.9*(1-ratio);
+  arc.style.stroke=T.kcal>goal*1.08?"var(--red)":T.kcal>=min?"var(--green)":"var(--orange)";
+  $("pTxt").textContent=`${fmt(T.protein)} / ${s.protein_hedef} g`;$("pBar").style.width=pct(T.protein,+s.protein_hedef);
+  $("cTxt").textContent=`${fmt(T.carb)} g`;$("cBar").style.width=pct(T.carb,300);
+  $("fTxt").textContent=`${fmt(T.fat)} g`;$("fBar").style.width=pct(T.fat,80);
+  const n=$("kcalNote"),h=new Date().getHours(),left=goal-T.kcal;
+  n.className="note";
+  if(T.kcal>goal*1.08) n.textContent=`Hedefi ${fmt(T.kcal-goal)} kcal aştın. Sorun değil, yarın normale dön.`;
+  else if(T.kcal>=min){n.className="note ok";n.textContent=left>0?`Harika gidiyorsun. ${fmt(left)} kcal hakkın kaldı.`:"Bugünkü hedef tamam 👍"}
+  else if(d<t||h>=19) n.textContent=`Bugün az yedin (${fmt(T.kcal)} kcal). En az ${fmt(min)} kcal ye, çok az yemek kas kaybettirir.`;
+  else n.textContent=`${fmt(left)} kcal hakkın var.`;
+  // öğünler
+  $("meals").innerHTML=MEALS.map(([k,lbl])=>{
+    const it=DAY.entries.filter(e=>e.meal===k),sum=it.reduce((a,e)=>a+e.kcal,0);
+    return `<div class="meal"><div class="mh"><b>${lbl} <span>${sum?fmt(sum)+" kcal":""}</span></b><button class="add" onclick="openAdd('${k}','${lbl}')">+ Ekle</button></div>
+    ${it.map(e=>`<div class="item"><div class="n">${esc(e.name)}<small>${portionTxt(e)}</small></div><span class="k">${fmt(e.kcal)} kcal</span><button class="x" onclick="delEntry(${e.id})">×</button></div>`).join("")}</div>`;
+  }).join("");
+  // su, adım
+  $("waterTxt").textContent=`${fmt(DAY.water)} / ${fmt(+s.su_hedef)} ml`;$("waterBar").style.width=pct(DAY.water,+s.su_hedef);
+  $("stepsTxt").textContent=`${fmt(DAY.steps)} / ${fmt(DAY.step_target)}`;$("stepsBar").style.width=pct(DAY.steps,DAY.step_target);
+  $("stepsIn").value=DAY.steps||"";
+  // egzersiz
+  $("woList").innerHTML=DAY.workouts_all.map((w,i)=>`<label class="chk"><input type="checkbox" ${DAY.workout.includes(w)?"checked":""} onchange="saveWo()" data-w="${esc(w)}">${esc(w)}</label>`).join("");
+  $("woTxt").textContent="haftada 2-3 gün";
+}
+function portionTxt(e){
+  const p=e.grams/e.portion_g;
+  const pt=Math.abs(p-Math.round(p*2)/2)<0.01?`${fmt(p,p%1?1:0)} ${e.portion_name} · `:"";
+  return `${pt}${fmt(e.grams)} g · ${fmt(e.protein,1)} g protein`;
+}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+async function delEntry(id){await api("/api/entries/"+id,{method:"DELETE"});loadDay()}
+async function water(n){await api("/api/water",{method:"POST",body:{day:iso(cur),delta:n}});loadDay()}
+async function saveSteps(){await api("/api/steps",{method:"POST",body:{day:iso(cur),steps:+$("stepsIn").value||0}});toast("Adım kaydedildi");loadDay()}
+async function saveWo(){
+  const done=[...document.querySelectorAll("#woList input:checked")].map(i=>i.dataset.w);
+  await api("/api/workout",{method:"POST",body:{day:iso(cur),done}});
+  if(done.length===DAY.workouts_all.length) toast("Antrenman tamam 💪");
+}
+
+// ------------- yiyecek ekleme -------------
+function openAdd(k,lbl){curMeal=k;$("mTitle").textContent=lbl+" ekle";$("mFood").classList.add("on");backPick();$("fq").value="";searchFoods();setTimeout(()=>$("fq").focus(),100)}
+function closeM(){$("mFood").classList.remove("on")}
+function backPick(){$("pickStep").style.display="";$("qtyStep").style.display="none"}
+let FOODS=[],st;
+function searchFoods(){clearTimeout(st);st=setTimeout(async()=>{
+  FOODS=await api("/api/foods?q="+encodeURIComponent($("fq").value));
+  $("flist").innerHTML=FOODS.map((f,i)=>`<div class="fi" onclick="pick(${i})">${esc(f.name)}${f.flags?f.flags.split(",").map(x=>`<span class="tag">${FLAG_TR[x]||x}</span>`).join(""):""}${f.custom?' <span class="tag" style="background:var(--blue)">benim</span>':""}
+  <small>1 ${esc(f.portion_name)} (${fmt(f.portion_g)} g) = ${fmt(f.kcal*f.portion_g/100)} kcal · ${fmt(f.protein*f.portion_g/100,1)} g protein</small></div>`).join("")||'<p style="color:var(--sub)">Bulunamadı. Ayarlar\'dan kendin ekleyebilirsin.</p>';
+},150)}
+function pick(i){sel=FOODS[i];$("selName").textContent=sel.name;$("pickStep").style.display="none";$("qtyStep").style.display="";setMode("p")}
+function setMode(m){mode=m;$("segP").classList.toggle("on",m==="p");$("segG").classList.toggle("on",m==="g");
+  $("qIn").value=m==="p"?1:sel.portion_g;$("qIn").step=m==="p"?0.5:10;preview()}
+function bump(n){const v=+String($("qIn").value).replace(",",".")||0;$("qIn").value=String(Math.max(0,v+n*(mode==="p"?0.5:10))).replace(".",",");preview()}
+function grams(){const v=+String($("qIn").value).replace(",",".")||0;return mode==="p"?v*sel.portion_g:v}
+function preview(){const g=grams();$("qPrev").innerHTML=`<b>${fmt(sel.kcal*g/100)} kcal</b><br>${fmt(g)} g · ${fmt(sel.protein*g/100,1)} g protein · ${fmt(sel.carb*g/100)} g karb · ${fmt(sel.fat*g/100)} g yağ`}
+async function confirmAdd(){const g=grams();if(g<=0)return toast("Miktar gir");
+  if(sel.flags&&sel.flags.includes("karamel")&&!confirm("Bu üründe karamel olabilir. Alerjin var, yine de eklensin mi?"))return;
+  await api("/api/entries",{method:"POST",body:{day:iso(cur),meal:curMeal,food_id:sel.id,grams:g}});closeM();loadDay()}
+
+// ------------- kilo -------------
+async function saveWeight(){const kg=parseFloat(String($("kgIn").value).replace(",","."));if(!kg)return;
+  await api("/api/weights",{method:"POST",body:{day:iso(new Date()),kg}});$("kgIn").value="";toast("Kaydedildi");loadWeights()}
+async function delWeight(d){await api("/api/weights/"+d,{method:"DELETE"});loadWeights()}
+async function loadWeights(){
+  const {weights:W,settings:s}=await api("/api/weights");
+  const start=+s.baslangic_kilo,last=W.length?W[W.length-1].avg7:start,lost=start-last;
+  // haftalık hız: son 14 güne göre
+  let rate=null;
+  if(W.length>=2){const a=W.find(w=>new Date(w.day)>=new Date(Date.now()-14*864e5))||W[0],b=W[W.length-1];
+    const days=(new Date(b.day)-new Date(a.day))/864e5;if(days>=6)rate=(a.avg7-b.avg7)/days*7}
+  const y=new Date().getFullYear(),m=new Date().getMonth();
+  const feb=new Date(m>=2?y+1:y,2,0),jun=new Date(m>=6?y+1:y,6,0);
+  const wks=d=>Math.max(0,(d-new Date())/(7*864e5));
+  $("wStats").innerHTML=`
+    <div><b>${fmt(last,1)}</b><span>şu an (7 gün ort.) kg</span></div>
+    <div><b style="color:var(--green)">${lost>0?"−":""}${fmt(Math.abs(lost),1)}</b><span>toplam verilen kg</span></div>
+    <div><b>${fmt(Math.max(0,last-s.hedef_subat),1)}</b><span>Şubat hedefine (${s.hedef_subat}) kalan · ${fmt(wks(feb))} hafta</span></div>
+    <div><b>${fmt(Math.max(0,last-s.hedef_haziran),1)}</b><span>Haziran hedefine (${s.hedef_haziran}) kalan · ${fmt(wks(jun))} hafta</span></div>
+    <div><b>${rate===null?"–":fmt(rate,2)}</b><span>haftalık kayıp hızı (kg)</span></div>
+    <div><b>${fmt(Math.max(0,last-s.hedef_son),1)}</b><span>son hedefe (${s.hedef_son}) kalan</span></div>`;
+  const n=$("wNote");n.className="note";
+  if(rate===null) n.textContent="Hız hesaplamak için en az 1 haftalık tartı gerekli. Haftada 2-3 kez tartıl.";
+  else if(rate>1.2) n.textContent="Biraz hızlı gidiyorsun. Yemeği biraz artır, haftada 0,5-1 kg ideal.";
+  else if(rate>=0.4){n.className="note ok";n.textContent="Hız ideal aralıkta 👍"}
+  else n.textContent="Son 2 hafta yavaş. Adımı 2.000 artır veya kaloriyi 150-200 azalt (alt sınırın altına inme).";
+  $("wList").innerHTML=W.slice().reverse().slice(0,30).map(w=>`<div class="item"><div class="n">${new Date(w.day).toLocaleDateString("tr-TR",{day:"numeric",month:"long",weekday:"short"})}<small>7 gün ort. ${fmt(w.avg7,1)}</small></div><span class="k">${fmt(w.kg,1)} kg</span><button class="x" onclick="delWeight('${w.day}')">×</button></div>`).join("")||'<p style="color:var(--sub)">Henüz kayıt yok.</p>';
+  drawChart(W,s);
+}
+function drawChart(W,s){
+  const svg=$("chart"),w=svg.clientWidth||340,h=220,P={l:34,r:8,t:10,b:22};
+  if(!W.length){svg.innerHTML=`<text x="${w/2}" y="${h/2}" fill="#8e8e93" text-anchor="middle" font-size="13">Tartı ekledikçe grafik oluşacak</text>`;return}
+  const t0=new Date(W[0].day).getTime(),t1=Math.max(new Date(W[W.length-1].day).getTime(),t0+7*864e5);
+  const vals=W.map(x=>x.kg).concat([+s.hedef_subat]);
+  const lo=Math.floor(Math.min(...vals)-1),hi=Math.ceil(Math.max(...vals)+1);
+  const X=t=>P.l+(t-t0)/(t1-t0)*(w-P.l-P.r),Y=v=>P.t+(hi-v)/(hi-lo)*(h-P.t-P.b);
+  let g="";
+  const step=Math.max(1,Math.round((hi-lo)/5));
+  for(let v=lo;v<=hi;v+=step)g+=`<line x1="${P.l}" x2="${w-P.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="#38383a"/><text x="${P.l-5}" y="${Y(v)+4}" fill="#8e8e93" font-size="10" text-anchor="end">${v}</text>`;
+  const gy=Y(+s.hedef_subat);
+  if(gy>=P.t&&gy<=h-P.b)g+=`<line x1="${P.l}" x2="${w-P.r}" y1="${gy}" y2="${gy}" stroke="#30d158" stroke-dasharray="4 4"/><text x="${w-P.r}" y="${gy-4}" fill="#30d158" font-size="10" text-anchor="end">Şubat hedefi</text>`;
+  g+=`<polyline fill="none" stroke="#0a84ff" stroke-width="2.5" stroke-linejoin="round" points="${W.map(x=>X(new Date(x.day).getTime())+","+Y(x.avg7)).join(" ")}"/>`;
+  g+=W.map(x=>`<circle cx="${X(new Date(x.day).getTime())}" cy="${Y(x.kg)}" r="2.5" fill="#8e8e93"/>`).join("");
+  const fd=d=>new Date(d).toLocaleDateString("tr-TR",{day:"numeric",month:"short"});
+  g+=`<text x="${P.l}" y="${h-6}" fill="#8e8e93" font-size="10">${fd(t0)}</text><text x="${w-P.r}" y="${h-6}" fill="#8e8e93" font-size="10" text-anchor="end">${fd(t1)}</text>`;
+  svg.setAttribute("viewBox",`0 0 ${w} ${h}`);svg.innerHTML=g;
+}
+
+// ------------- geçmiş -------------
+async function loadHistory(){
+  const {days:D,settings:s}=await api("/api/history?days=30");
+  const last7=D.filter(d=>new Date(d.day)>=new Date(Date.now()-7*864e5));
+  const avg=k=>last7.length?last7.reduce((a,d)=>a+d[k],0)/last7.length:0;
+  $("hStats").innerHTML=`
+    <div><b>${fmt(avg("kcal"))}</b><span>7 gün ort. kcal</span></div>
+    <div><b>${fmt(avg("protein"))} g</b><span>7 gün ort. protein</span></div>
+    <div><b>${fmt(avg("steps"))}</b><span>7 gün ort. adım</span></div>
+    <div><b>${last7.filter(d=>d.workout).length} / 3</b><span>bu hafta egzersiz günü</span></div>`;
+  $("hList").innerHTML=D.map(d=>{
+    const ok=d.kcal>=+s.kcal_min&&d.kcal<=+s.kcal_hedef*1.08;
+    return `<div class="hrow" onclick="goDay('${d.day}')"><div>${new Date(d.day).toLocaleDateString("tr-TR",{day:"numeric",month:"short",weekday:"short"})}<br><span>${fmt(d.steps)} adım · ${fmt(d.water/1000,1)} L su${d.workout?" · 🏋️":""}</span></div>
+    <div style="text-align:right"><b style="color:${d.kcal?ok?"var(--green)":"var(--orange)":"var(--sub)"}">${fmt(d.kcal)} kcal</b><br><span>${fmt(d.protein)} g protein</span></div></div>`;
+  }).join("")||'<p style="color:var(--sub)">Henüz kayıt yok.</p>';
+}
+function goDay(d){cur=new Date(d+"T12:00");show("today")}
+
+// ------------- ayarlar -------------
+const SKEYS=["kcal_hedef","kcal_min","protein_hedef","su_hedef","baslangic_tarih","baslangic_kilo","hedef_subat","hedef_haziran","hedef_son"];
+async function loadSettings(){
+  renderPinState();
+  const s=await api("/api/settings");
+  SKEYS.forEach(k=>$("s_"+k).value=s[k]);$("s_uyarilari_goster").checked=s.uyarilari_goster==="1";
+  const F=(await api("/api/foods")).filter(f=>f.custom);
+  $("customList").innerHTML=F.map(f=>`<div class="item"><div class="n">${esc(f.name)}<small>${fmt(f.kcal)} kcal / 100 g</small></div><button class="x" onclick="delFood(${f.id})">×</button></div>`).join("");
+}
+async function saveSettings(){
+  const b={};SKEYS.forEach(k=>b[k]=String($("s_"+k).value).replace(",","."));b.uyarilari_goster=$("s_uyarilari_goster").checked?"1":"0";
+  if(+b.kcal_hedef<+b.kcal_min){toast("Hedef, alt sınırdan düşük olamaz");return}
+  await api("/api/settings",{method:"PUT",body:b});toast("Kaydedildi");
+}
+async function addFood(){
+  const nv=id=>String($(id).value).replace(",",".");const b={name:$("nf_name").value,kcal:nv("nf_kcal"),protein:nv("nf_protein"),carb:nv("nf_carb"),fat:nv("nf_fat"),portion_name:$("nf_pn").value,portion_g:nv("nf_pg")};
+  if(!b.name||!b.kcal)return toast("Ad ve kcal gerekli");
+  await api("/api/foods",{method:"POST",body:b});["name","kcal","protein","carb","fat","pn","pg"].forEach(k=>$("nf_"+k).value="");toast("Eklendi");loadSettings();
+}
+async function delFood(id){await api("/api/foods/"+id,{method:"DELETE"});loadSettings()}
+
+if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("sw.js");
+if(!lockIfNeeded())loadDay();
+</script>
+</body>
+</html>

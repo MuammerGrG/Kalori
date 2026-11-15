@@ -96,6 +96,21 @@ nav button.on{color:var(--blue)}
 #lock{position:fixed;inset:0;background:#000;z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:30px}
 #lock b{font-size:22px}#lock input{max-width:220px;text-align:center;font-size:28px;letter-spacing:8px}
 .shake{animation:sh .35s}@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.tools{display:flex;gap:8px;margin-bottom:10px}
+.tools .btn{display:flex;align-items:center;justify-content:center;gap:6px}
+#scanVideo{width:100%;border-radius:12px;background:#111;aspect-ratio:4/3;object-fit:cover}
+.scanbox{position:relative}
+.scanbox::after{content:"";position:absolute;left:12%;right:12%;top:40%;height:20%;border:2px solid var(--green);border-radius:10px;pointer-events:none}
+.warnbox{background:rgba(255,69,58,.15);color:#ff9a93;border-radius:10px;padding:10px 12px;font-size:14px;margin:8px 0}
+.infobox{background:var(--card2);color:var(--sub);border-radius:10px;padding:10px 12px;font-size:13px;margin:8px 0}
+.aiitem{border-bottom:1px solid var(--line);padding:10px 0}
+.aiitem .top{display:flex;align-items:center;gap:10px}
+.aiitem .top input[type=checkbox]{width:22px;height:22px;accent-color:var(--green);flex:none}
+.aiitem .top .nm{flex:1;font-size:15px}
+.aiitem .row{display:flex;align-items:center;gap:8px;margin-top:6px;padding-left:32px;font-size:13px;color:var(--sub)}
+.aiitem .row input{width:90px;padding:7px 9px;font-size:15px}
+.spin{width:36px;height:36px;border:3px solid var(--line);border-top-color:var(--blue);border-radius:50%;animation:rt 0.8s linear infinite;margin:20px auto}
+@keyframes rt{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -216,6 +231,13 @@ nav button.on{color:var(--blue)}
     <div id="customList" style="margin-top:10px"></div>
   </div>
   <div class="card">
+    <h2>📷 Fotoğraftan kalori (Gemini)</h2>
+    <p style="color:var(--sub);font-size:13px;margin:0">Ücretsiz anahtar al: <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--blue)">aistudio.google.com/apikey</a> → "Create API key". Anahtar sadece bu telefonda saklanır, yedeğe girmez.</p>
+    <label>API anahtarı</label><input id="gKey" type="password" autocomplete="off" placeholder="AIza...">
+    <label>Model</label><input id="gModel" placeholder="gemini-2.5-flash">
+    <div class="btnrow"><button class="btn pri" onclick="saveGemini()">Kaydet</button></div>
+  </div>
+  <div class="card">
     <h2>🔒 PIN kilidi</h2>
     <div id="pinOff">
       <div class="grid2"><div><label>Yeni PIN (4-8 rakam)</label><input id="pin1" type="password" inputmode="numeric" pattern="[0-9]*"></div>
@@ -249,11 +271,26 @@ nav button.on{color:var(--blue)}
   <div class="sheet">
     <h3><span id="mTitle">Ekle</span><button onclick="closeM()">Kapat</button></h3>
     <div id="pickStep">
+      <div class="tools">
+        <button class="btn" onclick="openScan()">▥ Barkod tara</button>
+        <button class="btn" onclick="$('photoIn').click()">📷 Fotoğraftan</button>
+      </div>
+      <input type="file" id="photoIn" accept="image/*" style="display:none" onchange="analyzePhoto(this)">
       <input id="fq" placeholder="Ara: tavuk, yoğurt, pilav…" oninput="searchFoods()" autocomplete="off">
       <div class="flist" id="flist"></div>
     </div>
+    <div id="scanStep" style="display:none">
+      <div class="scanbox"><video id="scanVideo" playsinline muted></video></div>
+      <p style="color:var(--sub);font-size:13px;text-align:center;margin:8px 0">Barkodu yeşil çerçevenin içine getir</p>
+      <div class="btnrow"><input id="bcIn" type="text" inputmode="numeric" placeholder="ya da barkod numarasını yaz">
+        <button class="btn pri" style="flex:none;width:70px" onclick="lookupBarcode($('bcIn').value.trim())">Ara</button></div>
+      <div id="scanMsg"></div>
+      <div class="btnrow"><button class="btn" onclick="stopScan();backPick()">Geri</button></div>
+    </div>
+    <div id="aiStep" style="display:none"><div id="aiBody"></div></div>
     <div id="qtyStep" style="display:none">
       <div style="font-weight:600;font-size:17px" id="selName"></div>
+      <div id="selWarn"></div>
       <div class="seg"><button id="segP" class="on" onclick="setMode('p')">Porsiyon</button><button id="segG" onclick="setMode('g')">Gram</button></div>
       <div class="qty">
         <button onclick="bump(-1)">−</button>
@@ -327,21 +364,28 @@ async function api(path, opt = {}) {
   if (res === "foods") {
     if (m === "GET") {
       const q = lc(url.searchParams.get("q") || "").trim(), show = s.settings.uyarilari_goster === "1";
-      return s.foods.filter(f => (!q || lc(f.name).includes(q)) && (show || !f.flags))
+      return s.foods.filter(f => f.custom !== 2 && (!q || lc(f.name).includes(q)) && (show || !f.flags))
         .sort((a, c) => (c.custom - a.custom) || a.name.localeCompare(c.name, "tr"));
     }
     if (m === "POST") {
-      const name = String(b.name).trim();
-      if (s.foods.some(f => lc(f.name) === lc(name))) fail("Bu isimde yiyecek zaten var");
+      let name = String(b.name).trim();
+      const custom = b.custom === 2 ? 2 : 1;
+      if (b.barcode) { const ex = s.foods.find(f => f.barcode === b.barcode); if (ex) return ex; }
+      if (custom === 1 && s.foods.some(f => lc(f.name) === lc(name))) {
+        if (!b.barcode) fail("Bu isimde yiyecek zaten var");
+        name += " (" + b.barcode.slice(-4) + ")";
+      }
       const f = { id: s.nextId++, name, kcal: +b.kcal, protein: +b.protein || 0, carb: +b.carb || 0,
-        fat: +b.fat || 0, portion_name: b.portion_name || "porsiyon", portion_g: +b.portion_g || 100, flags: "", custom: 1 };
-      s.foods.push(f); save(); return { id: f.id };
+        fat: +b.fat || 0, portion_name: b.portion_name || "porsiyon", portion_g: +b.portion_g || 100,
+        flags: b.flags || "", custom, barcode: b.barcode || null, note: b.note || "" };
+      s.foods.push(f); save(); return f;
     }
     if (m === "DELETE") {
       const id = +arg; s.foods = s.foods.filter(f => !(f.id === id && f.custom));
       s.entries = s.entries.filter(e => foodById(e.food_id)); save(); return { ok: true };
     }
   }
+  if (res === "barcode") return s.foods.find(f => f.barcode === arg) || null;
   if (res === "day") {
     const entries = s.entries.filter(e => e.day === arg).map(e => {
       const f = foodById(e.food_id);
@@ -527,15 +571,20 @@ async function saveWo(){
 
 // ------------- yiyecek ekleme -------------
 function openAdd(k,lbl){curMeal=k;$("mTitle").textContent=lbl+" ekle";$("mFood").classList.add("on");backPick();$("fq").value="";searchFoods();setTimeout(()=>$("fq").focus(),100)}
-function closeM(){$("mFood").classList.remove("on")}
-function backPick(){$("pickStep").style.display="";$("qtyStep").style.display="none"}
+function closeM(){stopScan();$("mFood").classList.remove("on")}
+function backPick(){showStep("pickStep")}
 let FOODS=[],st;
 function searchFoods(){clearTimeout(st);st=setTimeout(async()=>{
   FOODS=await api("/api/foods?q="+encodeURIComponent($("fq").value));
   $("flist").innerHTML=FOODS.map((f,i)=>`<div class="fi" onclick="pick(${i})">${esc(f.name)}${f.flags?f.flags.split(",").map(x=>`<span class="tag">${FLAG_TR[x]||x}</span>`).join(""):""}${f.custom?' <span class="tag" style="background:var(--blue)">benim</span>':""}
   <small>1 ${esc(f.portion_name)} (${fmt(f.portion_g)} g) = ${fmt(f.kcal*f.portion_g/100)} kcal · ${fmt(f.protein*f.portion_g/100,1)} g protein</small></div>`).join("")||'<p style="color:var(--sub)">Bulunamadı. Ayarlar\'dan kendin ekleyebilirsin.</p>';
 },150)}
-function pick(i){sel=FOODS[i];$("selName").textContent=sel.name;$("pickStep").style.display="none";$("qtyStep").style.display="";setMode("p")}
+function pick(i){openQty(FOODS[i])}
+function showStep(id){["pickStep","scanStep","aiStep","qtyStep"].forEach(x=>$(x).style.display=x===id?"":"none")}
+function openQty(f){sel=f;$("selName").textContent=f.name;
+  const fl=(f.flags||"").split(",").filter(Boolean);
+  $("selWarn").innerHTML=(fl.length?`<div class="warnbox">⚠️ Dikkat: ${fl.map(x=>FLAG_TR[x]||x).join(", ")}</div>`:"")+(f.note?`<div class="infobox">${esc(f.note)}</div>`:"");
+  showStep("qtyStep");setMode("p")}
 function setMode(m){mode=m;$("segP").classList.toggle("on",m==="p");$("segG").classList.toggle("on",m==="g");
   $("qIn").value=m==="p"?1:sel.portion_g;$("qIn").step=m==="p"?0.5:10;preview()}
 function bump(n){const v=+String($("qIn").value).replace(",",".")||0;$("qIn").value=String(Math.max(0,v+n*(mode==="p"?0.5:10))).replace(".",",");preview()}
@@ -615,6 +664,7 @@ function goDay(d){cur=new Date(d+"T12:00");show("today")}
 const SKEYS=["kcal_hedef","kcal_min","protein_hedef","su_hedef","baslangic_tarih","baslangic_kilo","hedef_subat","hedef_haziran","hedef_son"];
 async function loadSettings(){
   renderPinState();
+  const g=getGemini();$("gKey").value=g.key;$("gModel").value=g.model;
   const s=await api("/api/settings");
   SKEYS.forEach(k=>$("s_"+k).value=s[k]);$("s_uyarilari_goster").checked=s.uyarilari_goster==="1";
   const F=(await api("/api/foods")).filter(f=>f.custom);
@@ -631,6 +681,116 @@ async function addFood(){
   await api("/api/foods",{method:"POST",body:b});["name","kcal","protein","carb","fat","pn","pg"].forEach(k=>$("nf_"+k).value="");toast("Eklendi");loadSettings();
 }
 async function delFood(id){await api("/api/foods/"+id,{method:"DELETE"});loadSettings()}
+
+// ================= BARKOD =================
+let zxReader=null;
+function loadZX(){return window.ZXing?Promise.resolve():new Promise((ok,no)=>{const s=document.createElement("script");s.src="zxing.min.js";s.onload=ok;s.onerror=()=>no();document.head.appendChild(s)})}
+async function openScan(){
+  showStep("scanStep");$("scanMsg").innerHTML="";$("bcIn").value="";
+  try{
+    await loadZX();
+    zxReader=new ZXing.BrowserMultiFormatReader();
+    await zxReader.decodeFromConstraints({video:{facingMode:"environment"}},$("scanVideo"),(res)=>{
+      if(res){const code=res.getText();stopScan();if(navigator.vibrate)navigator.vibrate(60);lookupBarcode(code)}
+    });
+  }catch(e){$("scanMsg").innerHTML='<div class="infobox">Kamera açılamadı. Ayarlar > Safari > Kamera iznini kontrol et ya da barkod numarasını elle yaz.</div>'}
+}
+function stopScan(){try{if(zxReader){zxReader.reset();zxReader=null}}catch(e){}}
+function detectFlags(txt,additives){
+  const t=lc(txt||""),f=[];
+  if(/domates|tomato|salça/.test(t))f.push("domates");
+  if(/peynir|kaşar|cheese|cheddar|mozzarella/.test(t))f.push("peynir");
+  if(/yumurta sarısı|egg yolk/.test(t))f.push("yumurta_sarisi");
+  if(/karamel|caramel/.test(t)||(additives||[]).some(a=>/^en:e150/.test(a)))f.push("karamel");
+  return f.join(",");
+}
+async function lookupBarcode(code){
+  if(!/^\d{6,14}$/.test(code)){toast("Geçerli bir barkod gir");return}
+  showStep("scanStep");
+  const local=await api("/api/barcode/"+code);
+  if(local){openQty(local);return}
+  $("scanMsg").innerHTML='<div class="spin"></div>';
+  try{
+    const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,product_name_tr,brands,nutriments,serving_quantity,ingredients_text,ingredients_text_tr,allergens_tags,additives_tags`);
+    const j=await r.json();
+    if(j.status!==1||!j.product)throw "yok";
+    const p=j.product,n=p.nutriments||{};
+    let kcal=n["energy-kcal_100g"];if(kcal==null&&n.energy_100g!=null)kcal=n.energy_100g/4.184;
+    if(kcal==null){$("scanMsg").innerHTML='<div class="infobox">Ürün bulundu ama kalori bilgisi yok. Ayarlar\'dan elle ekleyebilirsin.</div>';return}
+    const name=[p.product_name_tr||p.product_name||"Ürün",p.brands?"("+p.brands.split(",")[0].trim()+")":""].join(" ").trim();
+    const ingr=(p.ingredients_text_tr||"")+" "+(p.ingredients_text||"");
+    const flags=detectFlags(ingr+" "+name,p.additives_tags);
+    const egg=(p.allergens_tags||[]).includes("en:eggs");
+    const f=await api("/api/foods",{method:"POST",body:{name,kcal:Math.round(kcal),protein:r1(n.proteins_100g||0),carb:r1(n.carbohydrates_100g||0),fat:r1(n.fat_100g||0),
+      portion_name:p.serving_quantity?"porsiyon":"100 g",portion_g:+p.serving_quantity||100,barcode:code,flags,
+      note:"Barkoddan (Open Food Facts)."+(egg?" İçinde yumurta var, sarısı olup olmadığını etikete bak.":"")}});
+    openQty(f);
+  }catch(e){
+    $("scanMsg").innerHTML='<div class="infobox">Bu barkod veritabanında yok ya da internet yok. Etiketteki 100 g değerleriyle Ayarlar > Kendi yiyeceğini ekle\'den ekleyebilirsin.</div>';
+  }
+}
+
+// ================= FOTOĞRAF (Gemini) =================
+const G_KEY="kalori_gemini";
+function getGemini(){try{return {key:"",model:"gemini-2.5-flash",...JSON.parse(localStorage.getItem(G_KEY)||"{}")}}catch(e){return {key:"",model:"gemini-2.5-flash"}}}
+function saveGemini(){localStorage.setItem(G_KEY,JSON.stringify({key:$("gKey").value.trim(),model:$("gModel").value.trim()||"gemini-2.5-flash"}));toast("Kaydedildi")}
+function resizeImage(file,max=1024){return new Promise((ok,no)=>{const img=new Image();img.onload=()=>{
+  const sc=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement("canvas");c.width=img.width*sc;c.height=img.height*sc;
+  c.getContext("2d").drawImage(img,0,0,c.width,c.height);ok(c.toDataURL("image/jpeg",0.8).split(",")[1]);URL.revokeObjectURL(img.src)};
+  img.onerror=no;img.src=URL.createObjectURL(file)})}
+let AI=[];
+async function analyzePhoto(input){
+  const file=input.files[0];input.value="";if(!file)return;
+  const g=getGemini();
+  showStep("aiStep");
+  if(!g.key){$("aiBody").innerHTML='<div class="infobox">Önce Ayarlar\'dan ücretsiz Gemini API anahtarını gir.</div><div class="btnrow"><button class="btn" onclick="backPick()">Geri</button><button class="btn pri" onclick="closeM();show(\'settings\')">Ayarlara git</button></div>';return}
+  $("aiBody").innerHTML='<div class="spin"></div><p style="text-align:center;color:var(--sub)">Fotoğraf inceleniyor…</p>';
+  const prompt=`Bu fotoğraftaki yemekleri tanı ve her birinin porsiyon miktarını tabak/kaşık/ekmek gibi referanslara bakarak gram olarak tahmin et.
+Türk mutfağını iyi bil. Her kalem için TOPLAM (o porsiyonun) kcal, protein, karbonhidrat, yağ (gram) ver.
+Yağda kızarmış, tereyağlı veya soslu olup olmadığını hesaba kat.
+flags alanına şunlardan ilgili olanları yaz: "domates" (domates/salça içeriyorsa), "peynir", "yumurta_sarisi", "karamel", "mide" (kızartma, çok acı veya ağır yağlı ise).
+Yemek yoksa items boş dizi olsun.
+SADECE şu JSON'u döndür:
+{"items":[{"name":"Türkçe ad","grams":0,"kcal":0,"protein":0,"carb":0,"fat":0,"flags":[]}],"note":"kısa Türkçe not (emin olmadığın şeyler)"}`;
+  try{
+    const b64=await resizeImage(file);
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(g.model)}:generateContent`,{
+      method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":g.key},
+      body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:"image/jpeg",data:b64}}]}],
+        generationConfig:{response_mime_type:"application/json",temperature:0.2}})});
+    const j=await r.json();
+    if(!r.ok){const m=(j.error&&j.error.message)||r.status;throw new Error(r.status===429?"Ücretsiz kullanım sınırı doldu, biraz sonra tekrar dene.":r.status===400||r.status===403?"API anahtarı geçersiz görünüyor: "+m:"Hata: "+m)}
+    const txt=j.candidates[0].content.parts.map(p=>p.text||"").join("");
+    const d=JSON.parse(txt.replace(/^```json|```$/g,"").trim());
+    AI=(d.items||[]).filter(x=>x.grams>0).map(x=>({...x,base:x.grams,on:true}));
+    renderAI(d.note||"");
+  }catch(e){
+    $("aiBody").innerHTML=`<div class="infobox">${esc(e.message||"Fotoğraf analiz edilemedi. İnternet bağlantını kontrol et.")}</div><div class="btnrow"><button class="btn" onclick="backPick()">Geri</button></div>`;
+  }
+}
+function aiScaled(x){const k=x.grams/x.base;return {kcal:x.kcal*k,protein:x.protein*k,carb:x.carb*k,fat:x.fat*k}}
+let AINOTE="";
+function renderAI(note){if(note!==undefined)AINOTE=note;note=AINOTE;
+  if(!AI.length){$("aiBody").innerHTML='<div class="infobox">Fotoğrafta yemek bulunamadı. Daha yakından ve ışıklı çekmeyi dene.</div><div class="btnrow"><button class="btn" onclick="backPick()">Geri</button></div>';return}
+  const tot=AI.filter(x=>x.on).reduce((a,x)=>{const s=aiScaled(x);a.k+=s.kcal;a.p+=s.protein;return a},{k:0,p:0});
+  const flagged=[...new Set(AI.filter(x=>x.on).flatMap(x=>x.flags||[]))];
+  $("aiBody").innerHTML=AI.map((x,i)=>{const s=aiScaled(x);return `<div class="aiitem"><div class="top"><input type="checkbox" ${x.on?"checked":""} onchange="AI[${i}].on=this.checked;renderAI()">
+    <div class="nm">${esc(x.name)}${(x.flags||[]).map(f=>`<span class="tag">${FLAG_TR[f]||f}</span>`).join("")}</div><b>${fmt(s.kcal)} kcal</b></div>
+    <div class="row"><input type="text" inputmode="decimal" value="${fmt(x.grams)}" onchange="AI[${i}].grams=Math.max(1,+String(this.value).split('.').join('').replace(',','.')||1);renderAI()"> g · ${fmt(s.protein,1)} g protein</div></div>`}).join("")+
+  (flagged.length?`<div class="warnbox">⚠️ Dikkat: ${flagged.map(f=>FLAG_TR[f]||f).join(", ")}</div>`:"")+
+  `<div class="infobox">Bu bir tahmindir, %20-30 sapabilir. Gramları düzeltebilirsin.${note?"<br>"+esc(note):""}</div>
+  <div class="preview"><b>${fmt(tot.k)} kcal</b><br>${fmt(tot.p,1)} g protein</div>
+  <div class="btnrow"><button class="btn" onclick="backPick()">Geri</button><button class="btn pri" onclick="confirmAI()">Öğüne ekle</button></div>`;
+}
+async function confirmAI(){
+  const items=AI.filter(x=>x.on);if(!items.length)return toast("En az bir kalem seç");
+  if(items.some(x=>(x.flags||[]).includes("karamel"))&&!confirm("Bu yemekte karamel olabilir. Alerjin var, yine de eklensin mi?"))return;
+  for(const x of items){const s=aiScaled(x),g=x.grams,per=v=>r1(v/g*100);
+    const f=await api("/api/foods",{method:"POST",body:{name:"📷 "+x.name,kcal:per(s.kcal),protein:per(s.protein),carb:per(s.carb),fat:per(s.fat),portion_name:"porsiyon",portion_g:g,flags:(x.flags||[]).join(","),custom:2}});
+    await api("/api/entries",{method:"POST",body:{day:iso(cur),meal:curMeal,food_id:f.id,grams:g}});
+  }
+  closeM();toast("Eklendi");loadDay();
+}
 
 if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("sw.js");
 if(!lockIfNeeded())loadDay();

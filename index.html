@@ -283,6 +283,7 @@ nav button.on{color:var(--blue)}
       <button class="btn" onclick="document.getElementById('impIn').click()">Yedeği yükle</button></div>
     <input type="file" id="impIn" accept=".json,application/json" style="display:none" onchange="importBackup(this)">
   </div>
+  <p style="color:var(--sub);font-size:12px;text-align:center;margin:0">Sürüm 11</p>
   <p style="color:var(--sub);font-size:12px;text-align:center;padding:0 10px">Tüm veriler sadece bu cihazda saklanır, hiçbir sunucuya gönderilmez. Değerler yaklaşıktır. Kalori ve kilo hedeflerini doktorun ya da diyetisyeninle birlikte ayarla.</p>
 </section>
 </main>
@@ -1056,7 +1057,10 @@ async function confirmAI(){
   closeM();toast("Eklendi");loadDay();
 }
 
-if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("sw.js");
+if("serviceWorker" in navigator&&location.protocol==="https:"){
+  navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).then(r=>r.update()).catch(()=>{});
+  let reloaded=false;navigator.serviceWorker.addEventListener("controllerchange",()=>{if(!reloaded&&!document.querySelector(".modal.on")){reloaded=true;location.reload()}});
+}
 if(!lockIfNeeded())loadDay();
 </script>
 </body>

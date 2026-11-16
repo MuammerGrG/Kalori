@@ -130,6 +130,7 @@ nav button.on{color:var(--blue)}
 <main>
 <!-- ======================= BUGÜN ======================= -->
 <section class="tab on" id="t-today">
+  <div class="card" id="bkBanner" style="display:none;background:rgba(255,159,10,.15)"><div style="font-size:14px;color:var(--orange)">💾 <span id="bkTxt"></span></div><div class="btnrow"><button class="btn pri" onclick="exportBackup()">Şimdi yedekle</button></div></div>
   <div class="card">
     <div class="ringwrap">
       <div class="ring">
@@ -169,11 +170,11 @@ nav button.on{color:var(--blue)}
 
   <div class="card">
     <h2>🚬 Sigara <small id="cigTxt"></small></h2>
-    <div style="display:flex;align-items:center;gap:14px">
-      <button class="btn" style="flex:none;width:56px;font-size:22px" onclick="cig(-1)">−</button>
-      <div style="flex:1;text-align:center"><b id="cigN" style="font-size:34px">0</b><div style="color:var(--sub);font-size:13px">bugün</div></div>
-      <button class="btn pri" style="flex:none;width:56px;font-size:22px" onclick="cig(1)">+</button>
+    <div class="stat" style="margin-bottom:6px">
+      <div><b id="cigN">0</b><span>bugün adet</span></div>
+      <div><b id="nicN">0</b><span>mg nikotin</span></div>
     </div>
+    <div id="cigList"></div>
     <div class="note" id="cigNote"></div>
   </div>
 
@@ -241,6 +242,16 @@ nav button.on{color:var(--blue)}
     </div>
     <div class="btnrow"><button class="btn pri" onclick="addFood()">Ekle</button></div>
     <div id="customList" style="margin-top:10px"></div>
+  </div>
+  <div class="card">
+    <h2>🚬 Sigara türlerim</h2>
+    <div id="cigTypeList"></div>
+    <div class="grid2" style="margin-top:10px">
+      <div><label>Ad (örn. içtiğin marka)</label><input id="ct_name"></div>
+      <div><label>Nikotin (mg / adet)</label><input id="ct_nic" type="text" inputmode="decimal" placeholder="0,8"></div>
+    </div>
+    <div class="btnrow"><button class="btn pri" onclick="addCigType()">Tür ekle</button></div>
+    <p style="color:var(--sub);font-size:12px;margin:10px 0 0">Paketlerde nikotin değeri artık yazmıyor. Yasal üst sınır 1 mg, değerler yaklaşık. Markanın değerini biliyorsan kendin girebilirsin.</p>
   </div>
   <div class="card">
     <h2>📷 Fotoğraftan kalori (Gemini)</h2>
@@ -342,6 +353,14 @@ function load() {
   // hazır yiyeceklerin birim ve uyarılarını güncel tut
   const seedBy = Object.fromEntries(SEED_FOODS.map(f => [f.name, f]));
   s.foods.forEach(f => { const sf = !f.custom && seedBy[f.name]; if (sf) { f.unit = sf.unit; f.flags = sf.flags; } });
+  // sigara türleri (ilk açılışta hazır türler)
+  if (!s.cigTypes) s.cigTypes = [
+    { id: 1, name: "Normal (kırmızı paket)", nic: 0.8 },
+    { id: 2, name: "Light (mavi/gri paket)", nic: 0.5 },
+    { id: 3, name: "Slim / ultra light", nic: 0.3 },
+  ];
+  // eski sürüm: tek sayı -> ilk türe aktar
+  Object.values(s.daily).forEach(d => { if (d.cig && !d.cigs) d.cigs = { [s.cigTypes[0].id]: d.cig }; delete d.cig; });
   STORE = s; return s;
 }
 function save() {
@@ -355,7 +374,12 @@ function stepTarget(day, s) {
   const week = Math.floor((new Date(day) - new Date(s.baslangic_tarih)) / 864e5 / 7) + 1;
   return week <= 4 ? 6000 : week <= 8 ? 8000 : 10000;
 }
-function dailyRow(day) { return { water: 0, steps: 0, workout: [], cig: 0, ...(load().daily[day] || {}) }; }
+function dailyRow(day) { return { water: 0, steps: 0, workout: [], cigs: {}, ...(load().daily[day] || {}) }; }
+function cigStats(d) {
+  const types = load().cigTypes; let n = 0, nic = 0;
+  for (const [id, c] of Object.entries(d.cigs || {})) { const t = types.find(x => x.id === +id); n += c; nic += c * (t ? t.nic : 0.8); }
+  return { cig: n, nic: r1(nic) };
+}
 function setDaily(day, kw) { const d = { ...dailyRow(day), ...kw }; load().daily[day] = d; save(); return d; }
 function foodById(id) { return load().foods.find(f => f.id === id); }
 function dayTotals(day) {
@@ -408,7 +432,7 @@ async function api(path, opt = {}) {
         portion_g: f.portion_g, kcal: Math.round(f.kcal * e.grams / 100), protein: r1(f.protein * e.grams / 100) };
     });
     const d = dailyRow(arg);
-    return { day: arg, entries, totals: dayTotals(arg), water: d.water, steps: d.steps, workout: d.workout, cig: d.cig,
+    return { day: arg, entries, totals: dayTotals(arg), water: d.water, steps: d.steps, workout: d.workout, cigs: d.cigs, ...cigStats(d), cigTypes: s.cigTypes,
       workouts_all: WORKOUTS, step_target: stepTarget(arg, s.settings), settings: s.settings };
   }
   if (res === "entries") {
@@ -417,7 +441,25 @@ async function api(path, opt = {}) {
   }
   if (res === "water") return setDaily(b.day, { water: Math.max(0, dailyRow(b.day).water + (+b.delta)) });
   if (res === "steps") return setDaily(b.day, { steps: Math.max(0, +b.steps || 0) });
-  if (res === "cig") return setDaily(b.day, { cig: Math.max(0, dailyRow(b.day).cig + (+b.delta)) });
+  if (res === "cig") {
+    const d = dailyRow(b.day), cigs = { ...d.cigs }, k = String(+b.type);
+    cigs[k] = Math.max(0, (cigs[k] || 0) + (+b.delta)); if (!cigs[k]) delete cigs[k];
+    const r = setDaily(b.day, { cigs }); return { ...r, ...cigStats(r) };
+  }
+  if (res === "cigtypes") {
+    if (m === "GET") return s.cigTypes;
+    if (m === "POST") {
+      const name = String(b.name || "").trim(), nic = +String(b.nic).replace(",", ".");
+      if (!name) fail("Ad gir"); if (!(nic >= 0 && nic <= 5)) fail("Nikotin 0-5 mg arası olmalı");
+      const t = { id: s.nextId++, name, nic: r1(nic * 10) / 10 }; s.cigTypes.push(t); save(); return t;
+    }
+    if (m === "DELETE") {
+      if (s.cigTypes.length <= 1) fail("En az bir tür kalmalı");
+      const used = Object.values(s.daily).some(d => d.cigs && d.cigs[arg]);
+      if (used) fail("Bu tür geçmiş kayıtlarda kullanılmış, silinemez");
+      s.cigTypes = s.cigTypes.filter(t => t.id !== +arg); save(); return { ok: true };
+    }
+  }
   if (res === "workout") return setDaily(b.day, { workout: (b.done || []).filter(w => WORKOUTS.includes(w)) });
   if (res === "weights") {
     if (m === "GET") {
@@ -438,8 +480,9 @@ async function api(path, opt = {}) {
       const dt = new Date(); dt.setDate(dt.getDate() - i);
       const d = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
       const t = dayTotals(d), r = dailyRow(d);
-      if (t.kcal || r.water || r.steps || r.workout.length || r.cig)
-        out.push({ day: d, ...t, water: r.water, steps: r.steps, cig: r.cig, workout: r.workout.length > 0, step_target: stepTarget(d, s.settings) });
+      const cs = cigStats(r);
+      if (t.kcal || r.water || r.steps || r.workout.length || cs.cig)
+        out.push({ day: d, ...t, water: r.water, steps: r.steps, ...cs, workout: r.workout.length > 0, step_target: stepTarget(d, s.settings) });
     }
     return { days: out, settings: s.settings };
   }
@@ -453,6 +496,7 @@ async function api(path, opt = {}) {
 // ===== Yedekleme =====
 async function exportBackup() {
   const data = JSON.stringify(load(), null, 1);
+  load().lastBackup = Date.now(); save();
   const name = `kalori-yedek-${todayIso()}.json`;
   const file = new File([data], name, { type: "application/json" });
   try {
@@ -567,6 +611,10 @@ async function loadDay(){
   $("stepsTxt").textContent=`${fmt(DAY.steps)} / ${fmt(DAY.step_target)}`;$("stepsBar").style.width=pct(DAY.steps,DAY.step_target);
   $("stepsIn").value=DAY.steps||"";
   renderCig();
+  const st=load(),days=st.lastBackup?Math.floor((Date.now()-st.lastBackup)/864e5):null;
+  const hasData=st.entries.length>0||Object.keys(st.weights).length>0;
+  $("bkBanner").style.display=hasData&&(days===null||days>=7)?"":"none";
+  $("bkTxt").textContent=days===null?"Henüz hiç yedek almadın. Veriler sadece bu telefonda; bir yedeği iCloud Drive'a kaydet.":`Son yedek ${days} gün önce. Haftalık yedek alma zamanı.`;
   // egzersiz
   $("woList").innerHTML=DAY.workouts_all.map((w,i)=>`<label class="chk"><input type="checkbox" ${DAY.workout.includes(w)?"checked":""} onchange="saveWo()" data-w="${esc(w)}">${esc(w)}</label>`).join("");
   $("woTxt").textContent="haftada 2-3 gün";
@@ -579,12 +627,17 @@ function portionTxt(e){
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 async function delEntry(id){await api("/api/entries/"+id,{method:"DELETE"});loadDay()}
 async function water(n){await api("/api/water",{method:"POST",body:{day:iso(cur),delta:n}});loadDay()}
-async function cig(n){const r=await api("/api/cig",{method:"POST",body:{day:iso(cur),delta:n}});DAY.cig=r.cig;renderCig()}
+async function cig(type,n){const r=await api("/api/cig",{method:"POST",body:{day:iso(cur),type,delta:n}});DAY.cigs=r.cigs;DAY.cig=r.cig;DAY.nic=r.nic;renderCig()}
 async function renderCig(){
   const lim=+DAY.settings.sigara_hedef||0,n=DAY.cig||0;
   const prev=new Date(cur);prev.setDate(prev.getDate()-1);
   const y=(await api("/api/day/"+iso(prev))).cig||0;
   $("cigN").textContent=n;$("cigN").style.color=lim&&n>lim?"var(--red)":"";
+  $("nicN").textContent=fmt(DAY.nic||0,1);
+  $("cigList").innerHTML=DAY.cigTypes.map(t=>{const c=(DAY.cigs||{})[t.id]||0;return `<div class="item" style="border-top:1px solid var(--line)">
+    <div class="n">${esc(t.name)}<small>${fmt(t.nic,1)} mg nikotin / adet</small></div>
+    <div class="qty" style="flex:none"><button onclick="cig(${t.id},-1)" style="width:38px;height:38px;font-size:20px">−</button>
+    <b style="min-width:28px;text-align:center">${c}</b><button onclick="cig(${t.id},1)" style="width:38px;height:38px;font-size:20px;background:var(--blue)">+</button></div></div>`}).join("");
   $("cigTxt").textContent=(lim?`hedef en fazla ${lim} · `:"")+`dün ${y}`;
   const nt=$("cigNote");nt.className="note";
   if(lim&&n>lim)nt.textContent=`Bugünkü hedefini ${n-lim} geçtin.`;
@@ -682,10 +735,11 @@ async function loadHistory(){
     <div><b>${fmt(avg("protein"))} g</b><span>7 gün ort. protein</span></div>
     <div><b>${fmt(avg("steps"))}</b><span>7 gün ort. adım</span></div>
     <div><b>${last7.filter(d=>d.workout).length} / 3</b><span>bu hafta egzersiz günü</span></div>
-    <div><b>${fmt(avg("cig"),1)}</b><span>7 gün ort. sigara</span></div>`;
+    <div><b>${fmt(avg("cig"),1)}</b><span>7 gün ort. sigara</span></div>
+    <div><b>${fmt(avg("nic"),1)} mg</b><span>7 gün ort. nikotin</span></div>`;
   $("hList").innerHTML=D.map(d=>{
     const ok=d.kcal>=+s.kcal_min&&d.kcal<=+s.kcal_hedef*1.08;
-    return `<div class="hrow" onclick="goDay('${d.day}')"><div>${new Date(d.day).toLocaleDateString("tr-TR",{day:"numeric",month:"short",weekday:"short"})}<br><span>${fmt(d.steps)} adım · ${fmt(d.water/1000,1)} L su${d.workout?" · 🏋️":""}${d.cig?" · 🚬 "+d.cig:""}</span></div>
+    return `<div class="hrow" onclick="goDay('${d.day}')"><div>${new Date(d.day).toLocaleDateString("tr-TR",{day:"numeric",month:"short",weekday:"short"})}<br><span>${fmt(d.steps)} adım · ${fmt(d.water/1000,1)} L su${d.workout?" · 🏋️":""}${d.cig?" · 🚬 "+d.cig+" ("+fmt(d.nic,1)+" mg)":""}</span></div>
     <div style="text-align:right"><b style="color:${d.kcal?ok?"var(--green)":"var(--orange)":"var(--sub)"}">${fmt(d.kcal)} kcal</b><br><span>${fmt(d.protein)} g protein</span></div></div>`;
   }).join("")||'<p style="color:var(--sub)">Henüz kayıt yok.</p>';
 }
@@ -695,6 +749,8 @@ function goDay(d){cur=new Date(d+"T12:00");show("today")}
 const SKEYS=["kcal_hedef","kcal_min","protein_hedef","su_hedef","sigara_hedef","baslangic_tarih","baslangic_kilo","hedef_subat","hedef_haziran","hedef_son"];
 async function loadSettings(){
   renderPinState();
+  const CT=await api("/api/cigtypes");
+  $("cigTypeList").innerHTML=CT.map(t=>`<div class="item"><div class="n">${esc(t.name)}<small>${fmt(t.nic,1)} mg nikotin</small></div><button class="x" onclick="delCigType(${t.id})">×</button></div>`).join("");
   const g=getGemini();$("gKey").value=g.key;$("gModel").value=g.model;
   const s=await api("/api/settings");
   SKEYS.forEach(k=>$("s_"+k).value=s[k]);$("s_uyarilari_goster").checked=s.uyarilari_goster==="1";
@@ -711,6 +767,8 @@ async function addFood(){
   if(!b.name||!b.kcal)return toast("Ad ve kcal gerekli");
   await api("/api/foods",{method:"POST",body:b});["name","kcal","protein","carb","fat","pn","pg"].forEach(k=>$("nf_"+k).value="");toast("Eklendi");loadSettings();
 }
+async function addCigType(){await api("/api/cigtypes",{method:"POST",body:{name:$("ct_name").value,nic:$("ct_nic").value}});$("ct_name").value=$("ct_nic").value="";toast("Eklendi");loadSettings()}
+async function delCigType(id){if(!confirm("Bu tür silinsin mi?"))return;await api("/api/cigtypes/"+id,{method:"DELETE"});loadSettings()}
 async function delFood(id){await api("/api/foods/"+id,{method:"DELETE"});loadSettings()}
 
 // ================= BARKOD =================

@@ -262,7 +262,7 @@ nav button.on{color:var(--blue)}
     <h2>📷 Fotoğraftan kalori (Gemini)</h2>
     <p style="color:var(--sub);font-size:13px;margin:0">Ücretsiz anahtar al: <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--blue)">aistudio.google.com/apikey</a> → "Create API key". Anahtar sadece bu telefonda saklanır, yedeğe girmez.</p>
     <label>API anahtarı</label><input id="gKey" type="password" autocomplete="off" placeholder="AIza...">
-    <label>Model</label><input id="gModel" placeholder="gemini-3.8-flash">
+    <label>Model</label><input id="gModel" placeholder="gemini-flash-latest">
     <div class="btnrow"><button class="btn pri" onclick="saveGemini()">Kaydet</button><button class="btn" onclick="testGemini()">Bağlantıyı test et</button></div>
     <pre id="gTest" style="display:none;white-space:pre-wrap;word-break:break-word;background:var(--card2);border-radius:10px;padding:10px;font-size:12px;color:var(--sub);margin:10px 0 0"></pre>
   </div>
@@ -284,7 +284,7 @@ nav button.on{color:var(--blue)}
       <button class="btn" onclick="document.getElementById('impIn').click()">Yedeği yükle</button></div>
     <input type="file" id="impIn" accept=".json,application/json" style="display:none" onchange="importBackup(this)">
   </div>
-  <p style="color:var(--sub);font-size:12px;text-align:center;margin:0">Sürüm 13</p>
+  <p style="color:var(--sub);font-size:12px;text-align:center;margin:0">Sürüm 14</p>
   <p style="color:var(--sub);font-size:12px;text-align:center;padding:0 10px">Tüm veriler sadece bu cihazda saklanır, hiçbir sunucuya gönderilmez. Değerler yaklaşıktır. Kalori ve kilo hedeflerini doktorun ya da diyetisyeninle birlikte ayarla.</p>
 </section>
 </main>
@@ -940,9 +940,9 @@ async function lookupBarcode(code){
 
 // ================= FOTOĞRAF (Gemini) =================
 const G_KEY="kalori_gemini";
-const G_DEFAULT="gemini-3.8-flash";
+const G_DEFAULT="gemini-flash-latest";
 function getGemini(){let g;try{g={key:"",model:G_DEFAULT,...JSON.parse(localStorage.getItem(G_KEY)||"{}")}}catch(e){g={key:"",model:G_DEFAULT}}
-  if(!g.model||g.model==="gemini-2.5-flash")g.model=G_DEFAULT;return g}
+  if(!g.model||/^gemini-(2\.5|3\.8)-flash$/.test(g.model))g.model=G_DEFAULT;return g}
 // Gemini çağrısı: model kapatıldıysa hata mesajındaki önerilen modele geçip tekrar dener
 let G_MODELS=null;
 // Anahtarın erişebildiği "flash" modellerini listeler (yedek model seçmek için)
@@ -955,14 +955,14 @@ async function geminiModels(g){
     G_MODELS=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent"))
       .map(m=>m.name.replace("models/",""))
       .filter(n=>/^gemini-.*flash/.test(n)&&!/image|tts|audio|live|embed|thinking|exp/.test(n))
-      .sort((a,b)=>(/preview/.test(a)-/preview/.test(b))||(ver(b)-ver(a)));
+      .sort((a,b)=>(/-latest$/.test(b)-/-latest$/.test(a))||(/preview/.test(a)-/preview/.test(b))||(/lite/.test(a)-/lite/.test(b))||(ver(b)-ver(a)));
   }catch(e){G_MODELS=[]}
   return G_MODELS;
 }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 // simple=true: anahtar adreste, düz metin gövde -> tarayıcı ön kontrol (CORS preflight) yapmaz
 async function geminiCall(g,model,body,simple){
-  const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),45000);
+  const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),25000);
   const base=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   try{
     const r=simple
@@ -993,7 +993,7 @@ async function geminiGenerate(g,body){
     if(sug&&/no longer|deprecated|not found|update your code/i.test(msg)){model=sug;g.model=sug;localStorage.setItem(G_KEY,JSON.stringify({key:g.key,model:sug}));continue;}
     // geçici yoğunluk / sunucu hatası: bir kez bekleyip aynı modeli dene
     const busy=[500,502,503,504,408].includes(res.status)||/high demand|overloaded|unavailable|try again/i.test(msg);
-    if(busy&&!retried){retried=true;await sleep(2500);tried.delete(model);continue;}
+    if(busy&&!retried&&res.status!==408){retried=true;await sleep(2500);tried.delete(model);continue;}
     // yoğunluk veya kota: başka bir flash modele geç (bu sefer kalıcı değil)
     if(busy||res.status===429||res.status===404){
       const alt=(await geminiModels(g)).find(m=>!tried.has(m));
@@ -1004,13 +1004,13 @@ async function geminiGenerate(g,body){
   const s=last&&last.status;
   throw new Error(s===429?"Ücretsiz kullanım sınırı doldu, biraz sonra tekrar dene.":
     (s===503||s===500||/high demand|overloaded/i.test(last&&last.msg||""))?"Gemini şu an çok yoğun, tüm modeller denendi. Birkaç dakika sonra tekrar dene.":
-    s===408?"Gemini 45 saniyede cevap vermedi. İnternetini kontrol edip tekrar dene.":
+    s===408?"Gemini cevap vermedi (modeller denendi). Birkaç dakika sonra tekrar dene.":
     s===0?"Gemini'ye ulaşılamadı (3 kez denendi). İnterneti kontrol et; Wi-Fi'daysan mobil veriyle, mobil verideysen Wi-Fi ile dene. Teknik detay: "+(last&&last.msg):"Gemini hatası: "+(last&&last.msg));
 }
 async function testGemini(){
   const out=$("gTest");out.style.display="";const g=getGemini();
   const w=s=>{out.textContent+=s+"\n"};out.textContent="";
-  w("Sürüm 13 · model: "+g.model+" · anahtar: "+(g.key?g.key.slice(0,6)+"…("+g.key.length+" karakter)":"YOK"));
+  w("Sürüm 14 · model: "+g.model+" · anahtar: "+(g.key?g.key.slice(0,6)+"…("+g.key.length+" karakter)":"YOK"));
   w("İnternet: "+(navigator.onLine?"var":"YOK"));
   if(!g.key){w("→ Önce anahtarı gir ve Kaydet'e bas.");return}
   const t0=Date.now();
@@ -1019,7 +1019,9 @@ async function testGemini(){
     w("1) Model listesi: HTTP "+r.status+(r.ok?" ✔ "+((j.models||[]).filter(m=>/flash/.test(m.name)).map(m=>m.name.replace("models/","")).slice(0,6).join(", ")):" ✖ "+((j.error&&j.error.message)||"")));
   }catch(e){w("1) Model listesi: ✖ ağ hatası: "+(e.message||e.name))}
   for(const simple of [false,true]){
+    w((simple?"3) Basit istek":"2) Normal istek")+": bekleniyor…");
     const res=await geminiCall(g,g.model,{contents:[{parts:[{text:"Sadece OK yaz."}]}]},simple);
+    out.textContent=out.textContent.replace(/[^\n]*bekleniyor…\n$/,"");
     w((simple?"3) Basit istek":"2) Normal istek")+": "+(res.ok?"HTTP "+res.status+" ✔ cevap: "+(((res.j.candidates||[])[0]||{}).content?.parts?.[0]?.text||"").trim().slice(0,30):"✖ HTTP "+res.status+" · "+res.msg));
   }
   w("Süre: "+((Date.now()-t0)/1000).toFixed(1)+" sn");

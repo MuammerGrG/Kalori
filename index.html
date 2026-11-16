@@ -256,7 +256,7 @@ nav button.on{color:var(--blue)}
       <div><label>Nikotin (mg / adet)</label><input id="ct_nic" type="text" inputmode="decimal" placeholder="0,8"></div>
     </div>
     <div class="btnrow"><button class="btn pri" onclick="addCigType()">Tür ekle</button></div>
-    <p style="color:var(--sub);font-size:12px;margin:10px 0 0">Paketlerde nikotin değeri artık yazmıyor. Yasal üst sınır 1 mg, değerler yaklaşık. Markanın değerini biliyorsan kendin girebilirsin.</p>
+    <p style="color:var(--sub);font-size:12px;margin:10px 0 0">Türler paket barkodu okutulunca kendiliğinden eklenir. Paketlerde nikotin artık yazmıyor; değerler yaklaşık (yasal üst sınır 1 mg).</p>
   </div>
   <div class="card">
     <h2>📷 Fotoğraftan kalori (Gemini)</h2>
@@ -342,8 +342,11 @@ nav button.on{color:var(--blue)}
       <div id="cigScanMsg"></div>
     </div>
     <div id="cigNewStep" style="display:none">
-      <div class="infobox">Bu paketi ilk kez okuttun. Bir kez tanıt, sonraki taramalarda otomatik +1 eklenir.</div>
-      <label>Mevcut türe bağla</label><select id="cigLinkSel"></select>
+      <div class="infobox">Bu paketi ilk kez okuttun. Paketin önden fotoğrafını çek, bilgiler kendiliğinden dolsun. Sonraki taramalarda her şey otomatik.</div>
+      <button class="btn pri" style="width:100%" onclick="$('cigPhotoIn').click()">📷 Paketin fotoğrafını çek</button>
+      <input type="file" id="cigPhotoIn" accept="image/*" style="display:none" onchange="cigPhoto(this)">
+      <div id="cigAiMsg"></div>
+      <div id="cigLinkWrap"><label>Ya da mevcut türe bağla</label><select id="cigLinkSel"></select></div>
       <div id="cigNewForm">
         <div class="grid2" style="margin-top:10px">
           <div><label>Ad</label><input id="cigNewName"></div>
@@ -383,13 +386,22 @@ function load() {
   const seedBy = Object.fromEntries(SEED_FOODS.map(f => [f.name, f]));
   s.foods.forEach(f => { const sf = !f.custom && seedBy[f.name]; if (sf) { f.unit = sf.unit; f.flags = sf.flags; } });
   // sigara türleri (ilk açılışta hazır türler)
-  if (!s.cigTypes) s.cigTypes = [
-    { id: 1, name: "Normal (kırmızı paket)", nic: 0.8 },
-    { id: 2, name: "Light (mavi/gri paket)", nic: 0.5 },
-    { id: 3, name: "Slim / ultra light", nic: 0.3 },
-  ];
-  // eski sürüm: tek sayı -> ilk türe aktar
-  Object.values(s.daily).forEach(d => { if (d.cig && !d.cigs) d.cigs = { [s.cigTypes[0].id]: d.cig }; delete d.cig; });
+  if (!s.cigTypes) s.cigTypes = [];
+  // eski sürüm: tek sayı -> "Sigara" türüne aktar
+  Object.values(s.daily).forEach(d => {
+    if (d.cig && !d.cigs) {
+      let t = s.cigTypes.find(x => x.name === "Sigara");
+      if (!t) { t = { id: s.nextId++, name: "Sigara", nic: 0.8 }; s.cigTypes.push(t); }
+      d.cigs = { [t.id]: d.cig };
+    }
+    delete d.cig;
+  });
+  // eski hazır türleri (id 1-3) hiç kullanılmadıysa kaldır
+  if (!s.presetsRemoved) {
+    const used = id => Object.values(s.daily).some(d => d.cigs && d.cigs[id]);
+    s.cigTypes = s.cigTypes.filter(t => !([1, 2, 3].includes(t.id) && !t.barcode && !used(t.id)));
+    s.presetsRemoved = true;
+  }
   STORE = s; return s;
 }
 function save() {
@@ -488,7 +500,6 @@ async function api(path, opt = {}) {
       const t = { id: s.nextId++, name, nic: r1(nic * 10) / 10, barcode: b.barcode || null }; s.cigTypes.push(t); save(); return t;
     }
     if (m === "DELETE") {
-      if (s.cigTypes.length <= 1) fail("En az bir tür kalmalı");
       const used = Object.values(s.daily).some(d => d.cigs && d.cigs[arg]);
       if (used) fail("Bu tür geçmiş kayıtlarda kullanılmış, silinemez");
       s.cigTypes = s.cigTypes.filter(t => t.id !== +arg); save(); return { ok: true };
@@ -675,7 +686,8 @@ async function renderCig(){
   const y=(await api("/api/day/"+iso(prev))).cig||0;
   $("cigN").textContent=n;$("cigN").style.color=lim&&n>lim?"var(--red)":"";
   $("nicN").textContent=fmt(DAY.nic||0,1);
-  $("cigList").innerHTML=DAY.cigTypes.map(t=>{const c=(DAY.cigs||{})[t.id]||0;return `<div class="item" style="border-top:1px solid var(--line)">
+  $("cigList").innerHTML=DAY.cigTypes.length?"":'<div class="infobox">Henüz sigara türün yok. Aşağıdan paketi barkodla okut, tür kendiliğinden eklenir.</div>';
+  $("cigList").innerHTML+=DAY.cigTypes.map(t=>{const c=(DAY.cigs||{})[t.id]||0;return `<div class="item" style="border-top:1px solid var(--line)">
     <div class="n">${esc(t.name)}<small>${fmt(t.nic,1)} mg nikotin / adet</small></div>
     <div class="qty" style="flex:none"><button onclick="cig(${t.id},-1)" style="width:38px;height:38px;font-size:20px">−</button>
     <b style="min-width:28px;text-align:center">${c}</b><button onclick="cig(${t.id},1)" style="width:38px;height:38px;font-size:20px;background:var(--blue)">+</button></div></div>`}).join("");
@@ -849,6 +861,7 @@ async function cigBarcode(code){
   const t=await api("/api/cigbarcode/"+code);
   if(t){await cig(t.id,1);closeCig();toast(`${t.name} +1`);return}
   $("cigScanStep").style.display="none";$("cigNewStep").style.display="";
+  $("cigAiMsg").innerHTML="";$("cigLinkWrap").style.display=DAY.cigTypes.length?"":"none";
   $("cigLinkSel").innerHTML='<option value="new">➕ Yeni tür olarak ekle</option>'+DAY.cigTypes.map(x=>`<option value="${x.id}">${esc(x.name)} (${fmt(x.nic,1)} mg)</option>`).join("");
   $("cigLinkSel").onchange=()=>{$("cigNewForm").style.display=$("cigLinkSel").value==="new"?"":"none"};
   $("cigNewForm").style.display="";$("cigNewName").value="";$("cigNewNic").value="";
@@ -857,9 +870,32 @@ async function cigBarcode(code){
     const j=await r.json();const p=j.product||{};const nm=[p.brands,p.product_name].filter(Boolean).join(" ").trim();
     if(nm&&!$("cigNewName").value)$("cigNewName").value=nm;}catch(e){}
 }
+async function cigPhoto(input){
+  const file=input.files[0];input.value="";if(!file)return;
+  const g=getGemini();
+  if(!g.key){$("cigAiMsg").innerHTML='<div class="infobox">Fotoğrafla doldurmak için Ayarlar\'dan ücretsiz Gemini anahtarını gir. Şimdilik adı ve nikotini elle yazabilirsin.</div>';return}
+  $("cigAiMsg").innerHTML='<div class="spin"></div>';
+  const prompt=`Bu bir sigara paketi fotoğrafı. Marka ve çeşidi (ör. "Marlboro Touch Blue", "Parliament Aqua Blue Slims") paketin üzerindeki yazılardan oku.
+Bu çeşidin bilinen/tipik ISO nikotin değerini (mg/adet) ver; bilmiyorsan paket rengi ve tipine göre tahmin et (kırmızı/full ~0.8, mavi/light ~0.5-0.6, gri/silver/slim ~0.3-0.4). Değer 1.0'ı geçmesin.
+SADECE JSON döndür: {"name":"Marka Çeşit","nicotine_mg":0.0,"emin":true}`;
+  try{
+    const b64=await resizeImage(file);
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(g.model)}:generateContent`,{
+      method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":g.key},
+      body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:"image/jpeg",data:b64}}]}],generationConfig:{response_mime_type:"application/json",temperature:0.1}})});
+    const j=await r.json();
+    if(!r.ok)throw new Error(r.status===429?"Ücretsiz kullanım sınırı doldu, biraz sonra dene.":"Gemini hatası: "+((j.error&&j.error.message)||r.status));
+    const d=JSON.parse(j.candidates[0].content.parts.map(p=>p.text||"").join("").replace(/^```json|```$/g,"").trim());
+    $("cigLinkSel").value="new";$("cigNewForm").style.display="";
+    if(d.name)$("cigNewName").value=d.name;
+    if(d.nicotine_mg!=null)$("cigNewNic").value=String(Math.min(1,+d.nicotine_mg)).replace(".",",");
+    $("cigAiMsg").innerHTML=`<div class="infobox">Bulundu ✔ ${d.emin?"":"Nikotin değeri tahmini, "}kontrol edip kaydet.</div>`;
+  }catch(e){$("cigAiMsg").innerHTML=`<div class="infobox">${esc(e.message||"Fotoğraf okunamadı.")} Adı ve nikotini elle yazabilirsin.</div>`}
+}
 async function saveCigBarcode(){
   let id=$("cigLinkSel").value;
   try{
+    if(id==="new"&&!$("cigNewName").value.trim()){toast("Önce fotoğraf çek ya da adı yaz");return}
     if(id==="new"){const t=await api("/api/cigtypes",{method:"POST",body:{name:$("cigNewName").value,nic:$("cigNewNic").value||"0.8",barcode:cigCode}});id=t.id}
     else await api("/api/cigbarcode",{method:"POST",body:{type:id,barcode:cigCode}});
   }catch(e){return}

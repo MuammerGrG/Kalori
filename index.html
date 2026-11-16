@@ -385,6 +385,7 @@ function load() {
   // hazır yiyeceklerin birim ve uyarılarını güncel tut
   const seedBy = Object.fromEntries(SEED_FOODS.map(f => [f.name, f]));
   s.foods.forEach(f => { const sf = !f.custom && seedBy[f.name]; if (sf) { f.unit = sf.unit; f.flags = sf.flags; } });
+  s.foods.forEach(f => { if (f.custom && /cola|coca|pepsi|\bkola/i.test(f.name) && !/karamel/.test(f.flags || "")) f.flags = (f.flags ? f.flags + "," : "") + "karamel"; if (f.portion_name === "100") f.portion_name = "100 birim"; });
   // sigara türleri (ilk açılışta hazır türler)
   if (!s.cigTypes) s.cigTypes = [];
   // eski sürüm: tek sayı -> "Sigara" türüne aktar
@@ -469,7 +470,7 @@ async function api(path, opt = {}) {
   if (res === "day") {
     const entries = s.entries.filter(e => e.day === arg).map(e => {
       const f = foodById(e.food_id);
-      return { id: e.id, meal: e.meal, grams: e.grams, name: f.name, portion_name: f.portion_name, unit: f.unit || "g",
+      return { id: e.id, meal: e.meal, grams: e.grams, name: f.name, portion_name: f.portion_name, unit: f.unit || "g", flags: f.flags || "",
         portion_g: f.portion_g, kcal: Math.round(f.kcal * e.grams / 100), protein: r1(f.protein * e.grams / 100), carb: r1(f.carb * e.grams / 100), fat: r1(f.fat * e.grams / 100) };
     });
     const d = dailyRow(arg);
@@ -656,7 +657,7 @@ async function loadDay(){
   $("meals").innerHTML=MEALS.map(([k,lbl])=>{
     const it=DAY.entries.filter(e=>e.meal===k),sum=it.reduce((a,e)=>a+e.kcal,0);
     return `<div class="meal"><div class="mh"><b>${lbl} <span>${sum?fmt(sum)+" kcal":""}</span></b><button class="add" onclick="openAdd('${k}','${lbl}')">+ Ekle</button></div>
-    ${it.map(e=>`<div class="item"><div class="n">${esc(e.name)}<small>${portionTxt(e)}</small></div><span class="k">${fmt(e.kcal)} kcal</span><button class="x" onclick="delEntry(${e.id})">×</button></div>`).join("")}</div>`;
+    ${it.map(e=>`<div class="item"><div class="n">${esc(e.name)}${(e.flags||"").includes("karamel")?'<span class="tag">karamel ⚠️</span>':""}<small>${portionTxt(e)}</small></div><span class="k">${fmt(e.kcal)} kcal</span><button class="x" onclick="delEntry(${e.id})">×</button></div>`).join("")}</div>`;
   }).join("");
   // su, adım
   $("waterTxt").textContent=`${fmt(DAY.water)} / ${fmt(+s.su_hedef)} ml`;$("waterBar").style.width=pct(DAY.water,+s.su_hedef);
@@ -673,7 +674,7 @@ async function loadDay(){
 }
 function portionTxt(e){
   const p=e.grams/e.portion_g;
-  const pt=Math.abs(p-Math.round(p*2)/2)<0.01?`${fmt(p,p%1?1:0)} ${e.portion_name} · `:"";
+  const pt=Math.abs(p-Math.round(p*2)/2)<0.01&&!/^\d/.test(e.portion_name||"")?`${fmt(p,p%1?1:0)} ${e.portion_name} · `:"";
   return `${pt}${fmt(e.grams)} ${e.unit||"g"} · P ${fmt(e.protein)} · K ${fmt(e.carb||0)} · Y ${fmt(e.fat||0)}`;
 }
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -905,7 +906,7 @@ function detectFlags(txt,additives){
   if(/domates|tomato|salça/.test(t))f.push("domates");
   if(/peynir|kaşar|cheese|cheddar|mozzarella/.test(t))f.push("peynir");
   if(/yumurta sarısı|egg yolk/.test(t))f.push("yumurta_sarisi");
-  if(/karamel|caramel/.test(t)||(additives||[]).some(a=>/^en:e150/.test(a)))f.push("karamel");
+  if(/karamel|caramel|e ?150|\bcola\b|coca|pepsi|\bkola\b|cola-|-cola/.test(t)||(additives||[]).some(a=>/^en:e150/.test(a)))f.push("karamel");
   return f.join(",");
 }
 async function lookupBarcode(code){
@@ -926,7 +927,7 @@ async function lookupBarcode(code){
     const flags=detectFlags(ingr+" "+name,p.additives_tags);
     const egg=(p.allergens_tags||[]).includes("en:eggs");
     const f=await api("/api/foods",{method:"POST",body:{name,kcal:Math.round(kcal),protein:r1(n.proteins_100g||0),carb:r1(n.carbohydrates_100g||0),fat:r1(n.fat_100g||0),
-      portion_name:p.serving_quantity?"porsiyon":"100",portion_g:+p.serving_quantity||100,barcode:code,flags,
+      portion_name:p.serving_quantity?"porsiyon":"100 birim",portion_g:+p.serving_quantity||100,barcode:code,flags,
       unit:(lc(p.product_quantity_unit||"")==="ml"||/\d\s*(ml|cl|l|lt)\b/i.test(p.quantity||""))?"ml":"g",
       note:"Barkoddan (Open Food Facts)."+(egg?" İçinde yumurta var, sarısı olup olmadığını etikete bak.":"")}});
     openQty(f);
@@ -941,27 +942,63 @@ const G_DEFAULT="gemini-3.8-flash";
 function getGemini(){let g;try{g={key:"",model:G_DEFAULT,...JSON.parse(localStorage.getItem(G_KEY)||"{}")}}catch(e){g={key:"",model:G_DEFAULT}}
   if(!g.model||g.model==="gemini-2.5-flash")g.model=G_DEFAULT;return g}
 // Gemini çağrısı: model kapatıldıysa hata mesajındaki önerilen modele geçip tekrar dener
+let G_MODELS=null;
+// Anahtarın erişebildiği "flash" modellerini listeler (yedek model seçmek için)
+async function geminiModels(g){
+  if(G_MODELS)return G_MODELS;
+  try{
+    const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200",{headers:{"x-goog-api-key":g.key}});
+    const j=await r.json();
+    const ver=n=>parseFloat((n.match(/gemini-(\d+(\.\d+)?)/)||[])[1]||0);
+    G_MODELS=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent"))
+      .map(m=>m.name.replace("models/",""))
+      .filter(n=>/^gemini-.*flash/.test(n)&&!/image|tts|audio|live|embed|thinking|exp/.test(n))
+      .sort((a,b)=>(/preview/.test(a)-/preview/.test(b))||(ver(b)-ver(a)));
+  }catch(e){G_MODELS=[]}
+  return G_MODELS;
+}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function geminiCall(g,model,body){
+  const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),45000);
+  try{
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{
+      method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":g.key},body:JSON.stringify(body),signal:ctl.signal});
+    const j=await r.json().catch(()=>({}));
+    return {ok:r.ok,status:r.status,j,msg:(j.error&&j.error.message)||String(r.status)};
+  }catch(e){return {ok:false,status:e.name==="AbortError"?408:0,msg:e.name==="AbortError"?"zaman aşımı":"bağlantı hatası"}}
+  finally{clearTimeout(tm)}
+}
+// Gemini çağrısı: yoğunlukta bekleyip tekrar dener, olmazsa başka modele geçer
 async function geminiGenerate(g,body){
   body=JSON.parse(JSON.stringify(body));
   body.generationConfig={...(body.generationConfig||{}),thinkingConfig:{thinkingLevel:"low"}};
-  for(let i=0;i<3;i++){
-    const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),45000);
-    let r,j;
-    try{
-      r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(g.model)}:generateContent`,{
-        method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":g.key},body:JSON.stringify(body),signal:ctl.signal});
-      j=await r.json().catch(()=>({}));
-    }catch(e){throw new Error(e.name==="AbortError"?"Gemini 45 saniyede cevap vermedi. İnternetini kontrol edip tekrar dene.":"Bağlantı hatası: Gemini'ye ulaşılamadı.")}
-    finally{clearTimeout(tm)}
-    if(r.ok)return j;
-    const msg=(j.error&&j.error.message)||String(r.status);
-    // model düşünme ayarını desteklemiyorsa ayarı kaldırıp tekrar dene
-    if(r.status===400&&/thinking/i.test(msg)&&body.generationConfig.thinkingConfig){delete body.generationConfig.thinkingConfig;continue;}
-    const sug=msg.match(/models\/gemini-[\w.-]+/g);
-    const next=sug&&sug.map(x=>x.replace("models/","").replace(/[.]$/,"")).find(x=>x!==g.model);
-    if(i<2&&next){g.model=next;localStorage.setItem(G_KEY,JSON.stringify({key:g.key,model:next}));continue;}
-    throw new Error(r.status===429?"Ücretsiz kullanım sınırı doldu, biraz sonra tekrar dene.":/API key/i.test(msg)?"API anahtarı geçersiz görünüyor, Ayarlar'dan kontrol et.":"Gemini hatası: "+msg);
+  const tried=new Set();let model=g.model,last=null,retried=false;
+  for(let step=0;step<7;step++){
+    tried.add(model);
+    const res=await geminiCall(g,model,body);
+    if(res.ok)return res.j;
+    last=res;const msg=res.msg;
+    if(/API key|API_KEY/i.test(msg))throw new Error("API anahtarı geçersiz görünüyor, Ayarlar'dan kontrol et.");
+    // düşünme ayarı desteklenmiyorsa kaldır
+    if(res.status===400&&/thinking/i.test(msg)&&body.generationConfig.thinkingConfig){delete body.generationConfig.thinkingConfig;tried.delete(model);continue;}
+    // model kapatıldıysa önerilen modele kalıcı geç
+    const sug=(msg.match(/models\/gemini-[\w.-]+/g)||[]).map(x=>x.replace("models/","").replace(/[.]$/,"")).find(x=>!tried.has(x));
+    if(sug&&/no longer|deprecated|not found|update your code/i.test(msg)){model=sug;g.model=sug;localStorage.setItem(G_KEY,JSON.stringify({key:g.key,model:sug}));continue;}
+    // geçici yoğunluk / sunucu hatası: bir kez bekleyip aynı modeli dene
+    const busy=[500,502,503,504,408].includes(res.status)||/high demand|overloaded|unavailable|try again/i.test(msg);
+    if(busy&&!retried){retried=true;await sleep(2500);tried.delete(model);continue;}
+    // yoğunluk veya kota: başka bir flash modele geç (bu sefer kalıcı değil)
+    if(busy||res.status===429||res.status===404){
+      const alt=(await geminiModels(g)).find(m=>!tried.has(m));
+      if(alt){model=alt;retried=false;continue;}
+    }
+    break;
   }
+  const s=last&&last.status;
+  throw new Error(s===429?"Ücretsiz kullanım sınırı doldu, biraz sonra tekrar dene.":
+    (s===503||s===500||/high demand|overloaded/i.test(last&&last.msg||""))?"Gemini şu an çok yoğun, tüm modeller denendi. Birkaç dakika sonra tekrar dene.":
+    s===408?"Gemini 45 saniyede cevap vermedi. İnternetini kontrol edip tekrar dene.":
+    s===0?"Bağlantı hatası: Gemini'ye ulaşılamadı.":"Gemini hatası: "+(last&&last.msg));
 }
 function saveGemini(){localStorage.setItem(G_KEY,JSON.stringify({key:$("gKey").value.trim(),model:$("gModel").value.trim()||G_DEFAULT}));toast("Kaydedildi")}
 function resizeImage(file,max=1024){return Promise.race([resizeImage0(file,max),new Promise((_,no)=>setTimeout(()=>no(new Error("Fotoğraf işlenemedi, tekrar dene.")),15000))])}

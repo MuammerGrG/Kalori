@@ -262,7 +262,7 @@ nav button.on{color:var(--blue)}
     <h2>📷 Fotoğraftan kalori (Gemini)</h2>
     <p style="color:var(--sub);font-size:13px;margin:0">Ücretsiz anahtar al: <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--blue)">aistudio.google.com/apikey</a> → "Create API key". Anahtar sadece bu telefonda saklanır, yedeğe girmez.</p>
     <label>API anahtarı</label><input id="gKey" type="password" autocomplete="off" placeholder="AIza...">
-    <label>Model</label><input id="gModel" placeholder="gemini-2.5-flash">
+    <label>Model</label><input id="gModel" placeholder="gemini-3.8-flash">
     <div class="btnrow"><button class="btn pri" onclick="saveGemini()">Kaydet</button></div>
   </div>
   <div class="card">
@@ -880,11 +880,7 @@ Bu çeşidin bilinen/tipik ISO nikotin değerini (mg/adet) ver; bilmiyorsan pake
 SADECE JSON döndür: {"name":"Marka Çeşit","nicotine_mg":0.0,"emin":true}`;
   try{
     const b64=await resizeImage(file);
-    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(g.model)}:generateContent`,{
-      method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":g.key},
-      body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:"image/jpeg",data:b64}}]}],generationConfig:{response_mime_type:"application/json",temperature:0.1}})});
-    const j=await r.json();
-    if(!r.ok)throw new Error(r.status===429?"Ücretsiz kullanım sınırı doldu, biraz sonra dene.":"Gemini hatası: "+((j.error&&j.error.message)||r.status));
+    const j=await geminiGenerate(g,{contents:[{parts:[{text:prompt},{inline_data:{mime_type:"image/jpeg",data:b64}}]}],generationConfig:{response_mime_type:"application/json",temperature:0.1}});
     const d=JSON.parse(j.candidates[0].content.parts.map(p=>p.text||"").join("").replace(/^```json|```$/g,"").trim());
     $("cigLinkSel").value="new";$("cigNewForm").style.display="";
     if(d.name)$("cigNewName").value=d.name;
@@ -939,8 +935,24 @@ async function lookupBarcode(code){
 
 // ================= FOTOĞRAF (Gemini) =================
 const G_KEY="kalori_gemini";
-function getGemini(){try{return {key:"",model:"gemini-2.5-flash",...JSON.parse(localStorage.getItem(G_KEY)||"{}")}}catch(e){return {key:"",model:"gemini-2.5-flash"}}}
-function saveGemini(){localStorage.setItem(G_KEY,JSON.stringify({key:$("gKey").value.trim(),model:$("gModel").value.trim()||"gemini-2.5-flash"}));toast("Kaydedildi")}
+const G_DEFAULT="gemini-3.8-flash";
+function getGemini(){let g;try{g={key:"",model:G_DEFAULT,...JSON.parse(localStorage.getItem(G_KEY)||"{}")}}catch(e){g={key:"",model:G_DEFAULT}}
+  if(!g.model||g.model==="gemini-2.5-flash")g.model=G_DEFAULT;return g}
+// Gemini çağrısı: model kapatıldıysa hata mesajındaki önerilen modele geçip tekrar dener
+async function geminiGenerate(g,body){
+  for(let i=0;i<2;i++){
+    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(g.model)}:generateContent`,{
+      method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":g.key},body:JSON.stringify(body)});
+    const j=await r.json().catch(()=>({}));
+    if(r.ok)return j;
+    const msg=(j.error&&j.error.message)||String(r.status);
+    const sug=msg.match(/models\/gemini-[\w.-]+/g);
+    const next=sug&&sug.map(x=>x.replace("models/","").replace(/[.]$/,"")).find(x=>x!==g.model);
+    if(i===0&&next){g.model=next;localStorage.setItem(G_KEY,JSON.stringify({key:g.key,model:next}));continue;}
+    throw new Error(r.status===429?"Ücretsiz kullanım sınırı doldu, biraz sonra tekrar dene.":/API key/i.test(msg)?"API anahtarı geçersiz görünüyor, Ayarlar'dan kontrol et.":"Gemini hatası: "+msg);
+  }
+}
+function saveGemini(){localStorage.setItem(G_KEY,JSON.stringify({key:$("gKey").value.trim(),model:$("gModel").value.trim()||G_DEFAULT}));toast("Kaydedildi")}
 function resizeImage(file,max=1024){return new Promise((ok,no)=>{const img=new Image();img.onload=()=>{
   const sc=Math.min(1,max/Math.max(img.width,img.height)),c=document.createElement("canvas");c.width=img.width*sc;c.height=img.height*sc;
   c.getContext("2d").drawImage(img,0,0,c.width,c.height);ok(c.toDataURL("image/jpeg",0.8).split(",")[1]);URL.revokeObjectURL(img.src)};
@@ -961,12 +973,7 @@ SADECE şu JSON'u döndür:
 {"items":[{"name":"Türkçe ad","grams":0,"kcal":0,"protein":0,"carb":0,"fat":0,"flags":[]}],"note":"kısa Türkçe not (emin olmadığın şeyler)"}`;
   try{
     const b64=await resizeImage(file);
-    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(g.model)}:generateContent`,{
-      method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":g.key},
-      body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:"image/jpeg",data:b64}}]}],
-        generationConfig:{response_mime_type:"application/json",temperature:0.2}})});
-    const j=await r.json();
-    if(!r.ok){const m=(j.error&&j.error.message)||r.status;throw new Error(r.status===429?"Ücretsiz kullanım sınırı doldu, biraz sonra tekrar dene.":r.status===400||r.status===403?"API anahtarı geçersiz görünüyor: "+m:"Hata: "+m)}
+    const j=await geminiGenerate(g,{contents:[{parts:[{text:prompt},{inline_data:{mime_type:"image/jpeg",data:b64}}]}],generationConfig:{response_mime_type:"application/json",temperature:0.2}});
     const txt=j.candidates[0].content.parts.map(p=>p.text||"").join("");
     const d=JSON.parse(txt.replace(/^```json|```$/g,"").trim());
     AI=(d.items||[]).filter(x=>x.grams>0).map(x=>({...x,base:x.grams,on:true}));

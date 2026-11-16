@@ -283,7 +283,7 @@ nav button.on{color:var(--blue)}
       <button class="btn" onclick="document.getElementById('impIn').click()">Yedeği yükle</button></div>
     <input type="file" id="impIn" accept=".json,application/json" style="display:none" onchange="importBackup(this)">
   </div>
-  <p style="color:var(--sub);font-size:12px;text-align:center;margin:0">Sürüm 11</p>
+  <p style="color:var(--sub);font-size:12px;text-align:center;margin:0">Sürüm 12</p>
   <p style="color:var(--sub);font-size:12px;text-align:center;padding:0 10px">Tüm veriler sadece bu cihazda saklanır, hiçbir sunucuya gönderilmez. Değerler yaklaşıktır. Kalori ve kilo hedeflerini doktorun ya da diyetisyeninle birlikte ayarla.</p>
 </section>
 </main>
@@ -959,26 +959,31 @@ async function geminiModels(g){
   return G_MODELS;
 }
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-async function geminiCall(g,model,body){
+// simple=true: anahtar adreste, düz metin gövde -> tarayıcı ön kontrol (CORS preflight) yapmaz
+async function geminiCall(g,model,body,simple){
   const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),45000);
+  const base=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   try{
-    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{
-      method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":g.key},body:JSON.stringify(body),signal:ctl.signal});
+    const r=simple
+      ?await fetch(base+"?key="+encodeURIComponent(g.key),{method:"POST",headers:{"Content-Type":"text/plain;charset=UTF-8"},body:JSON.stringify(body),signal:ctl.signal})
+      :await fetch(base,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":g.key},body:JSON.stringify(body),signal:ctl.signal});
     const j=await r.json().catch(()=>({}));
     return {ok:r.ok,status:r.status,j,msg:(j.error&&j.error.message)||String(r.status)};
-  }catch(e){return {ok:false,status:e.name==="AbortError"?408:0,msg:e.name==="AbortError"?"zaman aşımı":"bağlantı hatası"}}
+  }catch(e){return {ok:false,status:e.name==="AbortError"?408:0,msg:e.name==="AbortError"?"zaman aşımı":(e.message||e.name||"bağlantı hatası")}}
   finally{clearTimeout(tm)}
 }
 // Gemini çağrısı: yoğunlukta bekleyip tekrar dener, olmazsa başka modele geçer
 async function geminiGenerate(g,body){
   body=JSON.parse(JSON.stringify(body));
   body.generationConfig={...(body.generationConfig||{}),thinkingConfig:{thinkingLevel:"low"}};
-  const tried=new Set();let model=g.model,last=null,retried=false;
-  for(let step=0;step<7;step++){
+  const tried=new Set();let model=g.model,last=null,retried=false,simple=false,netFails=0;
+  for(let step=0;step<8;step++){
     tried.add(model);
-    const res=await geminiCall(g,model,body);
+    const res=await geminiCall(g,model,body,simple);
     if(res.ok)return res.j;
     last=res;const msg=res.msg;
+    // ağ hatası: bekle, basit istek moduyla tekrar dene (2 kez)
+    if(res.status===0&&netFails<2){netFails++;simple=true;tried.delete(model);await sleep(2000);continue;}
     if(/API key|API_KEY/i.test(msg))throw new Error("API anahtarı geçersiz görünüyor, Ayarlar'dan kontrol et.");
     // düşünme ayarı desteklenmiyorsa kaldır
     if(res.status===400&&/thinking/i.test(msg)&&body.generationConfig.thinkingConfig){delete body.generationConfig.thinkingConfig;tried.delete(model);continue;}
@@ -999,7 +1004,7 @@ async function geminiGenerate(g,body){
   throw new Error(s===429?"Ücretsiz kullanım sınırı doldu, biraz sonra tekrar dene.":
     (s===503||s===500||/high demand|overloaded/i.test(last&&last.msg||""))?"Gemini şu an çok yoğun, tüm modeller denendi. Birkaç dakika sonra tekrar dene.":
     s===408?"Gemini 45 saniyede cevap vermedi. İnternetini kontrol edip tekrar dene.":
-    s===0?"Bağlantı hatası: Gemini'ye ulaşılamadı.":"Gemini hatası: "+(last&&last.msg));
+    s===0?"Gemini'ye ulaşılamadı (3 kez denendi). İnterneti kontrol et; Wi-Fi'daysan mobil veriyle, mobil verideysen Wi-Fi ile dene. Teknik detay: "+(last&&last.msg):"Gemini hatası: "+(last&&last.msg));
 }
 function saveGemini(){localStorage.setItem(G_KEY,JSON.stringify({key:$("gKey").value.trim(),model:$("gModel").value.trim()||G_DEFAULT}));toast("Kaydedildi")}
 function resizeImage(file,max=1024){return Promise.race([resizeImage0(file,max),new Promise((_,no)=>setTimeout(()=>no(new Error("Fotoğraf işlenemedi, tekrar dene.")),15000))])}

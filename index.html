@@ -263,7 +263,8 @@ nav button.on{color:var(--blue)}
     <p style="color:var(--sub);font-size:13px;margin:0">Ücretsiz anahtar al: <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--blue)">aistudio.google.com/apikey</a> → "Create API key". Anahtar sadece bu telefonda saklanır, yedeğe girmez.</p>
     <label>API anahtarı</label><input id="gKey" type="password" autocomplete="off" placeholder="AIza...">
     <label>Model</label><input id="gModel" placeholder="gemini-3.8-flash">
-    <div class="btnrow"><button class="btn pri" onclick="saveGemini()">Kaydet</button></div>
+    <div class="btnrow"><button class="btn pri" onclick="saveGemini()">Kaydet</button><button class="btn" onclick="testGemini()">Bağlantıyı test et</button></div>
+    <pre id="gTest" style="display:none;white-space:pre-wrap;word-break:break-word;background:var(--card2);border-radius:10px;padding:10px;font-size:12px;color:var(--sub);margin:10px 0 0"></pre>
   </div>
   <div class="card">
     <h2>🔒 PIN kilidi</h2>
@@ -283,7 +284,7 @@ nav button.on{color:var(--blue)}
       <button class="btn" onclick="document.getElementById('impIn').click()">Yedeği yükle</button></div>
     <input type="file" id="impIn" accept=".json,application/json" style="display:none" onchange="importBackup(this)">
   </div>
-  <p style="color:var(--sub);font-size:12px;text-align:center;margin:0">Sürüm 12</p>
+  <p style="color:var(--sub);font-size:12px;text-align:center;margin:0">Sürüm 13</p>
   <p style="color:var(--sub);font-size:12px;text-align:center;padding:0 10px">Tüm veriler sadece bu cihazda saklanır, hiçbir sunucuya gönderilmez. Değerler yaklaşıktır. Kalori ve kilo hedeflerini doktorun ya da diyetisyeninle birlikte ayarla.</p>
 </section>
 </main>
@@ -1005,6 +1006,23 @@ async function geminiGenerate(g,body){
     (s===503||s===500||/high demand|overloaded/i.test(last&&last.msg||""))?"Gemini şu an çok yoğun, tüm modeller denendi. Birkaç dakika sonra tekrar dene.":
     s===408?"Gemini 45 saniyede cevap vermedi. İnternetini kontrol edip tekrar dene.":
     s===0?"Gemini'ye ulaşılamadı (3 kez denendi). İnterneti kontrol et; Wi-Fi'daysan mobil veriyle, mobil verideysen Wi-Fi ile dene. Teknik detay: "+(last&&last.msg):"Gemini hatası: "+(last&&last.msg));
+}
+async function testGemini(){
+  const out=$("gTest");out.style.display="";const g=getGemini();
+  const w=s=>{out.textContent+=s+"\n"};out.textContent="";
+  w("Sürüm 13 · model: "+g.model+" · anahtar: "+(g.key?g.key.slice(0,6)+"…("+g.key.length+" karakter)":"YOK"));
+  w("İnternet: "+(navigator.onLine?"var":"YOK"));
+  if(!g.key){w("→ Önce anahtarı gir ve Kaydet'e bas.");return}
+  const t0=Date.now();
+  try{const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=50",{headers:{"x-goog-api-key":g.key}});
+    const j=await r.json().catch(()=>({}));
+    w("1) Model listesi: HTTP "+r.status+(r.ok?" ✔ "+((j.models||[]).filter(m=>/flash/.test(m.name)).map(m=>m.name.replace("models/","")).slice(0,6).join(", ")):" ✖ "+((j.error&&j.error.message)||"")));
+  }catch(e){w("1) Model listesi: ✖ ağ hatası: "+(e.message||e.name))}
+  for(const simple of [false,true]){
+    const res=await geminiCall(g,g.model,{contents:[{parts:[{text:"Sadece OK yaz."}]}]},simple);
+    w((simple?"3) Basit istek":"2) Normal istek")+": "+(res.ok?"HTTP "+res.status+" ✔ cevap: "+(((res.j.candidates||[])[0]||{}).content?.parts?.[0]?.text||"").trim().slice(0,30):"✖ HTTP "+res.status+" · "+res.msg));
+  }
+  w("Süre: "+((Date.now()-t0)/1000).toFixed(1)+" sn");
 }
 function saveGemini(){localStorage.setItem(G_KEY,JSON.stringify({key:$("gKey").value.trim(),model:$("gModel").value.trim()||G_DEFAULT}));toast("Kaydedildi")}
 function resizeImage(file,max=1024){return Promise.race([resizeImage0(file,max),new Promise((_,no)=>setTimeout(()=>no(new Error("Fotoğraf işlenemedi, tekrar dene.")),15000))])}
